@@ -1,3 +1,6 @@
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -11,9 +14,12 @@ import { Setting } from "./models/Setting";
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/ortera_crm");
-    console.log("[Seed] Очистка старых данных...");
+    const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/ortera_crm";
+    console.log("[Seed] Подключение к MongoDB...");
+    await mongoose.connect(mongoUri);
+    console.log("[Seed] Успешно подключено к базе данных!");
 
+    console.log("[Seed] Очистка старых данных...");
     await Promise.all([
       User.deleteMany({}),
       Client.deleteMany({}),
