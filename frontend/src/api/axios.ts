@@ -1,8 +1,8 @@
 import axios from "axios";
 
-// В продакшене берет URL из переменной окружения VITE_API_BASE_URL, локально — localhost
+// Прямой адрес на Render с fallback
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api";
+  import.meta.env.VITE_API_BASE_URL || "https://ortera-crm-api.onrender.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
