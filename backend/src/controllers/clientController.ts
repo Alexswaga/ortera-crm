@@ -7,23 +7,24 @@ import { Note } from "../models/Note";
 export const getClients = async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, status, search, isActive } = req.query;
-    const filter: any = {};
+    const filter: Record<string, any> = {};
     const authUser = (req as any).user;
 
     if (authUser?.role === "manager") {
       filter.manager = authUser.id || authUser._id;
     }
 
-    if (type) filter.type = type;
-    if (status) filter.status = status;
+    if (type) filter.type = String(type);
+    if (status) filter.status = String(status);
     if (isActive !== undefined) filter.isActive = isActive === "true";
 
     if (search) {
+      const searchStr = String(search);
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { city: { $regex: search, $options: "i" } },
-        { phone: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: searchStr, $options: "i" } },
+        { city: { $regex: searchStr, $options: "i" } },
+        { phone: { $regex: searchStr, $options: "i" } },
+        { email: { $regex: searchStr, $options: "i" } },
       ];
     }
 
@@ -32,7 +33,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
       .sort({ createdAt: -1 });
 
     const clientsWithCount = await Promise.all(
-      clients.map(async (client) => {
+      clients.map(async (client: any) => {
         const tasksCount = await Task.countDocuments({
           client: client._id,
           status: { $in: ["in_work", "overdue"] },
@@ -53,7 +54,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
 // 2. Получение детальной карточки клиента
 export const getClientById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const client = await Client.findById(id).populate("manager", "name email phone");
     if (!client) {
@@ -62,10 +63,10 @@ export const getClientById = async (req: Request, res: Response): Promise<void> 
     }
 
     const [tasks, notes] = await Promise.all([
-      Task.find({ client: id })
+      Task.find({ client: id as any })
         .populate("manager", "name email phone")
         .sort({ startDate: -1 }),
-      Note.find({ client: id }).sort({ createdAt: -1 }),
+      Note.find({ client: id as any }).sort({ createdAt: -1 }),
     ]);
 
     res.json({
@@ -127,7 +128,7 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
 // 4. Обновление клиента
 export const updateClient = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const updateData = req.body;
 
     const updated = await Client.findByIdAndUpdate(
@@ -150,7 +151,7 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
 // 5. Переключение активности клиента
 export const toggleClientActive = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const client = await Client.findById(id);
 
     if (!client) {
@@ -170,7 +171,7 @@ export const toggleClientActive = async (req: Request, res: Response): Promise<v
 // 6. Добавление заметки к клиенту
 export const addClientNote = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { text } = req.body;
     const authUser = (req as any).user;
 
@@ -180,7 +181,7 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
     }
 
     const note = await Note.create({
-      client: id,
+      client: id as any,
       author: authUser?.id || authUser?._id,
       text: text.trim(),
     });
@@ -194,10 +195,10 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
 // 7. Удаление клиента
 export const deleteClient = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     await Client.findByIdAndDelete(id);
-    await Task.deleteMany({ client: id });
-    await Note.deleteMany({ client: id });
+    await Task.deleteMany({ client: id as any });
+    await Note.deleteMany({ client: id as any });
 
     res.json({ message: "Клиент и связанные данные удалены" });
   } catch (error) {
