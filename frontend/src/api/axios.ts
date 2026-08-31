@@ -1,26 +1,33 @@
 import axios from "axios";
 
-// Прямой адрес на Render с fallback
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://ortera-crm-api.onrender.com/api";
+// 1. Приоритет: переменная окружения -> fallback на текущий хост (/api)
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? "/api"
+    : "https://ortera-crm.onrender.com/api");
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 15000,
 });
 
-// Автоматическое добавление JWT-токена к каждому запросу
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// 2. Автоматическое добавление токена к каждому запросу
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Обработка 401 ошибки (истечение сессии)
+// 3. Обработка протухшей сессии (401)
 api.interceptors.response.use(
   (response) => response,
   (error) => {

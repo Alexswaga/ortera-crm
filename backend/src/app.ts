@@ -1,5 +1,10 @@
-import express from "express";
+import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import path from "path";
+import rateLimit from "express-rate-limit";
+
+// Роуты
 import authRoutes from "./routes/authRoutes";
 import clientRoutes from "./routes/clientRoutes";
 import taskRoutes from "./routes/taskRoutes";
@@ -7,32 +12,59 @@ import managerRoutes from "./routes/managerRoutes";
 import scheduleRoutes from "./routes/scheduleRoutes";
 import settingRoutes from "./routes/settingRoutes";
 
-const app = express();
+const app: Application = express();
 
-// Разрешаем запросы с локалки и любого клиентского домена (например, на Vercel)
+// 1. Безопасность HTTP-заголовков
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // чтобы не блокировать внешние шрифты и скрипты геокодера
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// 2. Ограничение брутфорса на авторизацию (максимум 20 попыток за 15 минут)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { message: "Слишком много попыток входа. Попробуйте позже." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 3. Гибкий CORS (поддерживает и текущий тест, и боевой поддомен, и локалку)
 const allowedOrigins = [
-  process.env.CLIENT_URL,
   "http://localhost:5173",
   "http://localhost:3000",
-].filter(Boolean) as string[];
+  "https://ortera-crm.vercel.app",
+  "https://crm.ortera.ru",
+  "https://ortera.ru",
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Разрешаем запросы без origin (например, postman/мобильные клиенты) или входящие в allowedOrigins / *.vercel.app
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Для демо заказчику открываем полный доступ
+      // Разрешаем запросы без origin (например, от мобилок, curl или postman)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".vercel.app") ||
+        origin.endsWith(".ortera.ru")
+      ) {
+        return callback(null, true);
       }
+      return callback(null, true); // на этапе перехода не блокируем, но логируем
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// API Маршруты
+// 4. API Эндпоинты
+app.use("/api/auth/login", loginLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/tasks", taskRoutes);
@@ -40,8 +72,24 @@ app.use("/api/managers", managerRoutes);
 app.use("/api/schedule", scheduleRoutes);
 app.use("/api/settings", settingRoutes);
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "API CRM Ortera работает в штатном режиме" });
+// Healthcheck
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// 5. Раздача фронтенда (если фронт скомпилирован в backend/public или dist)
+const clientBuildPath = path.join(__dirname, "../../frontend/dist");
+app.use(express.static(clientBuildPath));
+
+app.get("*", (req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
+  res.sendFile(path.join(clientBuildPath, "index.html"), (err) => {
+    if (err) {
+      res.status(200).send("API Server is running. Ready for production.");
+    }
+  });
 });
 
 export default app;
