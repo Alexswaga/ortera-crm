@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from "react";
-import { Calendar, ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { tasksApi, clientsApi } from "../../api/services";
 
@@ -31,19 +31,10 @@ function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: stri
   );
 }
 
-const parseCustomDate = (dateStr: string): Date => {
-  const parts = dateStr.trim().split(/\s+/);
-  if (parts.length >= 1 && parts[0].includes(".")) {
-    const [day, month, year] = parts[0].split(".").map(Number);
-    let hours = 10;
-    let minutes = 0;
-    if (parts.length >= 2 && parts[1].includes(":")) {
-      [hours, minutes] = parts[1].split(":").map(Number);
-    }
-    return new Date(year, month - 1, day, hours, minutes);
-  }
-  const parsed = new Date(dateStr);
-  return isNaN(parsed.getTime()) ? new Date() : parsed;
+const getInitialDateTime = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
 };
 
 export default function ClientCreateTask() {
@@ -51,8 +42,7 @@ export default function ClientCreateTask() {
   const [searchParams] = useSearchParams();
   const clientIdParam = searchParams.get("clientId");
 
-  const [startDate, setStartDate] = useState("19.07.2026   12:00");
-  const [endDate, setEndDate] = useState("22.07.2026   10:00");
+  const [startDate, setStartDate] = useState(getInitialDateTime());
   const [clientSearch, setClientSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [taskType, setTaskType] = useState("Звонок");
@@ -105,21 +95,18 @@ export default function ClientCreateTask() {
     setIsLoading(true);
 
     try {
+      const parsedDate = new Date(startDate);
       await tasksApi.create({
         title: title.trim(),
         description: description.trim(),
         client: selectedClientId,
         type: taskType,
-        startDate: parseCustomDate(startDate),
-        endDate: parseCustomDate(endDate),
+        startDate: parsedDate,
+        endDate: parsedDate,
         status: "in_work",
       });
 
-      if (clientIdParam) {
-        navigate(`/client/clients/detail?id=${clientIdParam}`);
-      } else {
-        navigate("/client");
-      }
+      navigate(-1);
     } catch (err: any) {
       setError(err.response?.data?.message || "Ошибка при сохранении задачи");
     } finally {
@@ -130,9 +117,7 @@ export default function ClientCreateTask() {
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
-        
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 shadow-xs min-h-[690px] flex flex-col justify-between">
-          
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
               <h1 className="mb-8 text-[18px] font-bold text-[#576686]">
@@ -146,43 +131,44 @@ export default function ClientCreateTask() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-6">
-                
-                {/* 1. Дата начала */}
+                {/* 1. Дата и время со встроенным календарем */}
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Дата начала
+                    Дата и время
                   </label>
                   <div className="relative flex items-center w-full h-[52px] bg-white rounded-md border border-[#576686]/20 px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
                     <input
-                      type="text"
+                      type="datetime-local"
                       required
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full bg-transparent text-base text-[#576686] outline-none"
+                      className="w-full bg-transparent text-base text-[#576686] outline-none cursor-pointer"
                     />
-                    <Calendar className="h-4 w-4 text-[#576686]/50 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors duration-200 shrink-0 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* 2. Дата завершения */}
+                {/* 2. Тип задачи */}
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Дата завершения
+                    Тип задачи
                   </label>
                   <div className="relative flex items-center w-full h-[52px] bg-white rounded-md border border-[#576686]/20 px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                    <input
-                      type="text"
-                      required
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full bg-transparent text-base text-[#576686] outline-none"
-                    />
-                    <Calendar className="h-4 w-4 text-[#576686]/50 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors duration-200 shrink-0 pointer-events-none" />
+                    <select
+                      value={taskType}
+                      onChange={(e) => setTaskType(e.target.value)}
+                      className="w-full bg-transparent text-base text-[#576686] outline-none appearance-none cursor-pointer pr-6"
+                    >
+                      <option value="Звонок">Звонок</option>
+                      <option value="Встреча">Встреча</option>
+                      <option value="Отправить КП">Отправить КП</option>
+                      <option value="Оплата">Оплата</option>
+                    </select>
+                    <ChevronDown className="h-4 w-4 text-[#576686]/50 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors duration-200 absolute right-4 pointer-events-none" />
                   </div>
                 </div>
 
                 {/* 3. Клиент */}
-                <div className="group flex flex-col gap-2 relative">
+                <div className="group flex flex-col gap-2 relative md:col-span-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                     Клиент
                   </label>
@@ -220,27 +206,6 @@ export default function ClientCreateTask() {
                     </div>
                   )}
                 </div>
-
-                {/* 4. Тип задачи */}
-                <div className="group flex flex-col gap-2">
-                  <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Тип задачи
-                  </label>
-                  <div className="relative flex items-center w-full h-[52px] bg-white rounded-md border border-[#576686]/20 px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                    <select
-                      value={taskType}
-                      onChange={(e) => setTaskType(e.target.value)}
-                      className="w-full bg-transparent text-base text-[#576686] outline-none appearance-none cursor-pointer pr-6"
-                    >
-                      <option value="Звонок">Звонок</option>
-                      <option value="Встреча">Встреча</option>
-                      <option value="Отправить КП">Отправить КП</option>
-                      <option value="Оплата">Оплата</option>
-                    </select>
-                    <ChevronDown className="h-4 w-4 text-[#576686]/50 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors duration-200 absolute right-4 pointer-events-none" />
-                  </div>
-                </div>
-
               </div>
 
               {/* Название задачи */}
@@ -297,11 +262,8 @@ export default function ClientCreateTask() {
                 <span>{isLoading ? "Сохранение..." : "Сохранить"}</span>
               </button>
             </div>
-
           </form>
-
         </div>
-
       </div>
     </div>
   );

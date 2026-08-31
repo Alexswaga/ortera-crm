@@ -117,6 +117,10 @@ export const scheduleApi = {
     const { data } = await api.post(`/schedule/${eventId}/students`, payload);
     return data;
   },
+  updateStudentStatus: async (eventId: string, studentId: string, paymentStatus: string) => {
+    const { data } = await api.patch(`/schedule/${eventId}/students/${studentId}/status`, { paymentStatus });
+    return data;
+  },
   delete: async (id: string) => {
     const { data } = await api.delete(`/schedule/${id}`);
     return data;

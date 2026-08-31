@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Phone, Building, User as UserIconLucide } from "lucide-react";
 import { clientsApi, settingsApi } from "../../api/services";
 
 function ManagerRowIcon({ className = "w-4 h-4 text-[#576686]/60 shrink-0" }: { className?: string }) {
@@ -26,31 +26,6 @@ function EditRowIcon({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-function UserIcon({ className = "w-4 h-4 text-[#576686]" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="8" cy="8" r="6.75" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="8" cy="5.5" r="1.75" fill="currentColor" />
-      <path d="M4.2 12.2C4.9 10.3 6.3 9.5 8 9.5C9.7 9.5 11.1 10.3 11.8 12.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CompanyIcon({ className = "w-4 h-4 text-[#576686]" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2.5" y="2.5" width="11" height="1.8" rx="0.4" fill="currentColor" />
-      <path d="M2.2 5.2L3.2 8.5H12.8L13.8 5.2H2.2Z" fill="currentColor" />
-      <path 
-        fillRule="evenodd" 
-        clipRule="evenodd" 
-        d="M3 9.2H13V14H3V9.2ZM4.5 10.5H7.8V12.8H4.5V10.5ZM9.2 10.5H11.8V14H9.2V10.5Z" 
-        fill="currentColor" 
-      />
-    </svg>
-  );
-}
-
 const defaultTagsList = [
   "Использует стельки других производителей",
   "Наш студент",
@@ -60,16 +35,6 @@ const defaultTagsList = [
   "Любит вино",
   "Танцует и поет",
 ];
-
-const formatDate = (dateString?: string | Date) => {
-  if (!dateString) return "";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return String(dateString);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
-};
 
 export default function ClientClients() {
   const navigate = useNavigate();
@@ -190,9 +155,10 @@ export default function ClientClients() {
               ))}
             </div>
 
+            {/* Заголовки таблицы: Столбец Телефон */}
             <div className="flex items-center px-6 mb-3 text-[12px] text-[#576686]">
               <div className="w-[338px] pl-6">ФИО</div>
-              <div className="w-[171px]">Последняя связь</div>
+              <div className="w-[171px]">Телефон</div>
               <div className="w-[126px]">Город</div>
               <div className="w-[210px]">Деятельность</div>
               <div className="w-[175px]">Менеджер</div>
@@ -208,7 +174,7 @@ export default function ClientClients() {
               <div className="flex flex-col gap-3">
                 {filteredClients.map((client) => {
                   const isCompany = client.type === "company";
-                  const lastContact = formatDate(client.lastContactDate || client.createdAt);
+                  const displayPhone = client.phone || "Не указан";
                   const managerName = client.manager?.name || "Не назначен";
                   const badgeText = client.status || "Лид";
                   const clientTags = client.tags || [];
@@ -223,9 +189,9 @@ export default function ClientClients() {
                         <div className="w-[338px] flex items-center gap-3">
                           <div className="shrink-0">
                             {isCompany ? (
-                              <CompanyIcon className="w-4 h-4 text-[#576686]" />
+                              <Building className="w-4 h-4 text-[#576686]" />
                             ) : (
-                              <UserIcon className="w-4 h-4 text-[#576686]" />
+                              <UserIconLucide className="w-4 h-4 text-[#576686]" />
                             )}
                           </div>
                           <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
@@ -233,8 +199,10 @@ export default function ClientClients() {
                           </span>
                         </div>
 
-                        <div className="w-[171px] text-[12px]">
-                          {lastContact}
+                        {/* Столбец Телефон */}
+                        <div className="w-[171px] text-[12px] flex items-center gap-1.5 truncate">
+                          <Phone className="size-3 text-[#576686]/50 shrink-0" />
+                          <span className="truncate">{displayPhone}</span>
                         </div>
 
                         <div className="w-[126px] text-[12px]">

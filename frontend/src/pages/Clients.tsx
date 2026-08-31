@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Phone, Building, User as UserIconLucide } from "lucide-react";
 import { clientsApi } from "../api/services";
 
 function PlusIcon() {
@@ -34,48 +35,14 @@ function EditRowIcon({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-function UserIcon({ className = "w-4 h-4 text-[#576686]" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="8" cy="8" r="6.75" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="8" cy="5.5" r="1.75" fill="currentColor" />
-      <path d="M4.2 12.2C4.9 10.3 6.3 9.5 8 9.5C9.7 9.5 11.1 10.3 11.8 12.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CompanyIcon({ className = "w-4 h-4 text-[#576686]" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2.5" y="2.5" width="11" height="1.8" rx="0.4" fill="currentColor" />
-      <path d="M2.2 5.2L3.2 8.5H12.8L13.8 5.2H2.2Z" fill="currentColor" />
-      <path 
-        fillRule="evenodd" 
-        clipRule="evenodd" 
-        d="M3 9.2H13V14H3V9.2ZM4.5 10.5H7.8V12.8H4.5V10.5ZM9.2 10.5H11.8V14H9.2V10.5Z" 
-        fill="currentColor" 
-      />
-    </svg>
-  );
-}
-
-const formatDateTime = (dateString?: string | Date) => {
-  if (!dateString) return "";
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return String(dateString);
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${hours}:${minutes}  /  ${day}.${month}.${year}`;
-};
-
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeFilter, setActiveFilter] = useState<"all" | "orgs" | "private" | "active" | "inactive">("all");
+
+  // Два независимых фильтра
+  const [typeFilter, setTypeFilter] = useState<"all" | "orgs" | "private">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const loadClients = async () => {
     try {
@@ -106,10 +73,14 @@ export default function Clients() {
   };
 
   const filteredClients = clients.filter((client) => {
-    if (activeFilter === "orgs") return client.type === "company";
-    if (activeFilter === "private") return client.type === "individual";
-    if (activeFilter === "active") return client.isActive;
-    if (activeFilter === "inactive") return !client.isActive;
+    // 1. Фильтр по типу
+    if (typeFilter === "orgs" && client.type !== "company") return false;
+    if (typeFilter === "private" && client.type === "company") return false;
+
+    // 2. Фильтр по активности (независимый)
+    if (statusFilter === "active" && !client.isActive) return false;
+    if (statusFilter === "inactive" && client.isActive) return false;
+
     return true;
   });
 
@@ -119,66 +90,80 @@ export default function Clients() {
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[500px] flex flex-col justify-start shadow-xs">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter("all")}
-                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer ${
-                    activeFilter === "all"
-                      ? "bg-[#576686] text-white shadow-sm font-medium"
-                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  Все
-                </button>
+              <div className="flex flex-wrap items-center gap-6">
+                {/* Группа 1: Тип клиента */}
+                <div className="flex items-center gap-2 bg-white/60 p-1 rounded-[12px] border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setTypeFilter("all")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      typeFilter === "all"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Все
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTypeFilter("orgs")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      typeFilter === "orgs"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Организации
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTypeFilter("private")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      typeFilter === "private"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Частники
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter("orgs")}
-                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer ${
-                    activeFilter === "orgs"
-                      ? "bg-[#576686] text-white shadow-sm font-medium"
-                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  Организации
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter("private")}
-                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer ${
-                    activeFilter === "private"
-                      ? "bg-[#576686] text-white shadow-sm font-medium"
-                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  Частники
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter("active")}
-                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer ${
-                    activeFilter === "active"
-                      ? "bg-[#576686] text-white shadow-sm font-medium"
-                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  Активные
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveFilter("inactive")}
-                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer ${
-                    activeFilter === "inactive"
-                      ? "bg-[#576686] text-white shadow-sm font-medium"
-                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  Не активные
-                </button>
+                {/* Группа 2: Активность (независимая) */}
+                <div className="flex items-center gap-2 bg-white/60 p-1 rounded-[12px] border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      statusFilter === "all"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Все статусы
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("active")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      statusFilter === "active"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Активные
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("inactive")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      statusFilter === "inactive"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    Не активные
+                  </button>
+                </div>
               </div>
 
               <button
@@ -191,9 +176,10 @@ export default function Clients() {
               </button>
             </div>
 
-            <div className="flex items-center px-5 mb-3 text-[12px] text-[#576686]">
-              <div className="w-[338px] pl-7">ФИО</div>
-              <div className="w-[171px]">Дата регистрации</div>
+            {/* Заголовки таблицы: Вместо Даты регистрации теперь Телефон */}
+            <div className="flex items-center px-6 mb-3 text-[12px] text-[#576686]">
+              <div className="w-[338px] pl-6">ФИО</div>
+              <div className="w-[171px]">Телефон</div>
               <div className="w-[126px]">Город</div>
               <div className="w-[210px]">Деятельность</div>
               <div className="w-[175px]">Менеджер</div>
@@ -209,82 +195,97 @@ export default function Clients() {
               <div className="flex flex-col gap-3">
                 {filteredClients.map((client) => {
                   const isCompany = client.type === "company";
-                  const managerName = client.manager?.name || "Иванова Настя";
-                  const displayDate = formatDateTime(client.createdAt || client.lastContactDate);
+                  const managerName = client.manager?.name || "Не назначен";
+                  const displayPhone = client.phone || "Не указан";
                   const displayBadge = client.status || "Лид";
+                  const clientTagsList = client.tags || [];
 
                   return (
                     <div
                       key={client._id}
                       onClick={() => navigate(`/clients/detail?id=${client._id}`)}
-                      className="flex items-center justify-between rounded-[10px] bg-white px-5 h-12 border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2ABAEF]/40 hover:-translate-y-0.5 transition-all duration-150 text-[#576686] cursor-pointer group"
+                      className="flex flex-col justify-center rounded-[10px] bg-white px-6 py-3 border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2ABAEF]/40 hover:-translate-y-0.5 transition-all duration-150 text-[#576686] cursor-pointer group min-h-[76px]"
                     >
-                      <div className="w-[338px] flex items-center gap-3">
-                        <div className="shrink-0">
-                          {isCompany ? (
-                            <CompanyIcon className="w-4 h-4 text-[#576686]" />
-                          ) : (
-                            <UserIcon className="w-4 h-4 text-[#576686]" />
-                          )}
-                        </div>
-                        <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
-                          {client.name}
-                        </span>
-                      </div>
-
-                      <div className="w-[171px] text-[12px]">
-                        {displayDate}
-                      </div>
-
-                      <div className="w-[126px] text-[12px]">
-                        {client.city}
-                      </div>
-
-                      <div className="w-[210px] text-[12px] truncate pr-4">
-                        {client.activity}
-                      </div>
-
-                      <div className="w-[175px] flex items-center gap-2 text-[12px]">
-                        <ManagerRowIcon className="w-4 h-4 text-[#576686]" />
-                        <span>{managerName}</span>
-                      </div>
-
-                      <div className="w-[80px] text-[12px] text-[#70AF0A] font-medium">
-                        {client.tasksCount || 0}
-                      </div>
-
-                      <div className="flex items-center gap-4 ml-auto">
-                        <div className="px-3.5 py-1 bg-[#F5F7FA] rounded-full text-[12px] text-[#576686]">
-                          {displayBadge}
+                      <div className="flex items-center justify-between">
+                        <div className="w-[338px] flex items-center gap-3">
+                          <div className="shrink-0">
+                            {isCompany ? (
+                              <Building className="w-4 h-4 text-[#576686]" />
+                            ) : (
+                              <UserIconLucide className="w-4 h-4 text-[#576686]" />
+                            )}
+                          </div>
+                          <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
+                            {client.name}
+                          </span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={(e) => toggleClientActive(client._id, e)}
-                          aria-label="Переключить статус клиента"
-                          className={`w-14 h-7 rounded-full relative flex items-center px-1 transition-colors duration-200 cursor-pointer outline-none ${
-                            client.isActive ? "bg-[#F5F7FA]" : "bg-gray-200"
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 rounded-full transition-all duration-200 transform shadow-xs ${
-                              client.isActive ? "bg-[#2ABAEF] translate-x-7" : "bg-[#576686] translate-x-0"
+                        {/* Столбец Телефон */}
+                        <div className="w-[171px] text-[12px] flex items-center gap-1.5 truncate">
+                          <Phone className="size-3 text-[#576686]/50 shrink-0" />
+                          <span className="truncate">{displayPhone}</span>
+                        </div>
+
+                        <div className="w-[126px] text-[12px]">
+                          {client.city}
+                        </div>
+
+                        <div className="w-[210px] text-[12px] truncate pr-4">
+                          {client.activity}
+                        </div>
+
+                        <div className="w-[175px] flex items-center gap-2 text-[12px]">
+                          <ManagerRowIcon className="w-4 h-4 text-[#576686]" />
+                          <span>{managerName}</span>
+                        </div>
+
+                        <div className="w-[80px] text-[12px] text-[#70AF0A] font-medium">
+                          {client.tasksCount || 0}
+                        </div>
+
+                        <div className="flex items-center gap-4 ml-auto">
+                          <div className="px-3.5 py-1 bg-[#F5F7FA] rounded-full text-[12px] text-[#576686]">
+                            {displayBadge}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => toggleClientActive(client._id, e)}
+                            aria-label="Переключить статус клиента"
+                            className={`w-14 h-7 rounded-full relative flex items-center px-1 transition-colors duration-200 cursor-pointer outline-none ${
+                              client.isActive ? "bg-[#F5F7FA]" : "bg-gray-200"
                             }`}
-                          />
-                        </button>
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full transition-all duration-200 transform shadow-xs ${
+                                client.isActive ? "bg-[#2ABAEF] translate-x-7" : "bg-[#576686] translate-x-0"
+                              }`}
+                            />
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/clients/add?id=${client._id}`);
-                          }}
-                          aria-label="Редактировать клиента"
-                          className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-[#576686] hover:text-white active:scale-90 transition-all duration-150 cursor-pointer text-[#576686]"
-                        >
-                          <EditRowIcon className="w-4 h-4" />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/clients/add?id=${client._id}`);
+                            }}
+                            aria-label="Редактировать клиента"
+                            className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-[#576686] hover:text-white active:scale-90 transition-all duration-150 cursor-pointer text-[#576686]"
+                          >
+                            <EditRowIcon className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
+
+                      {clientTagsList.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 pl-7 text-[12px] text-[#576686]/60">
+                          {clientTagsList.map((t: string, idx: number) => (
+                            <span key={idx} className="whitespace-nowrap hover:text-[#576686] transition-colors">
+                              # {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

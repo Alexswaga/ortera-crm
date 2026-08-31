@@ -7,7 +7,8 @@ import {
   Plus, 
   MoreVertical,
   X,
-  Search
+  Search,
+  Check
 } from "lucide-react";
 import { scheduleApi, clientsApi } from "../api/services";
 
@@ -89,12 +90,15 @@ export default function Schedule() {
   const [currentYear, setCurrentYear] = useState(2026);
   const [loading, setLoading] = useState(true);
 
+  // Выпадающее меню изменения статуса оплаты
+  const [openStatusMenuKey, setOpenStatusMenuKey] = useState<string | null>(null);
+
+  // Модалка записи клиента
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [targetCourseId, setTargetCourseId] = useState<string | null>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState<"paid" | "advance">("paid");
   const [isSubmittingStudent, setIsSubmittingStudent] = useState(false);
 
   const loadSchedule = async () => {
@@ -127,7 +131,6 @@ export default function Schedule() {
     setTargetCourseId(courseId);
     setSelectedClientId("");
     setClientSearchQuery("");
-    setPaymentStatus("paid");
     setIsAddStudentOpen(true);
     try {
       const clients = await clientsApi.getAll();
@@ -148,7 +151,7 @@ export default function Schedule() {
     try {
       await scheduleApi.addStudent(targetCourseId, {
         clientId: selectedClientId,
-        paymentStatus,
+        paymentStatus: "advance",
       });
       setIsAddStudentOpen(false);
       await loadSchedule();
@@ -156,6 +159,16 @@ export default function Schedule() {
       console.error("Ошибка добавления студента на курс:", err);
     } finally {
       setIsSubmittingStudent(false);
+    }
+  };
+
+  const handleStatusChange = async (courseId: string, studentId: string, newStatus: string) => {
+    try {
+      setOpenStatusMenuKey(null);
+      await scheduleApi.updateStudentStatus(courseId, studentId, newStatus);
+      await loadSchedule();
+    } catch (err) {
+      console.error("Ошибка смены статуса оплаты:", err);
     }
   };
 
@@ -284,7 +297,9 @@ export default function Schedule() {
                   <div className="flex flex-col gap-6">
                     {courses.map((course) => {
                       const isOpened = !openCourseIds[course._id];
-                      const displayDate = `${course.startDate} / ${course.startTime} - ${course.endDate} / ${course.endTime}`;
+                      const displayDate = course.startDate === course.endDate || !course.endDate
+                        ? course.startDate
+                        : `${course.startDate} - ${course.endDate}`;
                       const studentsList = course.students || [];
 
                       return (
@@ -340,19 +355,22 @@ export default function Schedule() {
                               {studentsList.map((studentItem: any, idx: number) => {
                                 const stClient = studentItem.client || {};
                                 const stManager = studentItem.manager || {};
-                                const stName = stClient.name || "Николаев Дмитрий Александрович";
+                                const stName = stClient.name || "Клиент";
                                 const stRole = stClient.city ? `г. ${stClient.city} / ${stClient.activity || "Подолог"}` : "г. Чебоксары / Подолог";
-                                const stPhone = stClient.phone || "+7 927 668 95 18";
+                                const stPhone = stClient.phone || "Не указан";
                                 const stManagerName = stManager.name || "Иванова Настя";
-                                const isPaid = studentItem.paymentStatus === "paid";
+                                const paymentSt = studentItem.paymentStatus || "advance";
+                                const itemKey = `${course._id}-${studentItem._id || idx}`;
 
                                 return (
                                   <div
                                     key={idx}
-                                    onClick={() => stClient._id && navigate(`/clients/detail?id=${stClient._id}`)}
-                                    className="flex items-center justify-between h-14 px-5 rounded-[10px] bg-[#F5F7FA] text-[#576686] text-sm hover:bg-slate-100 transition-colors cursor-pointer"
+                                    className="flex items-center justify-between h-14 px-5 rounded-[10px] bg-[#F5F7FA] text-[#576686] text-sm hover:bg-slate-100 transition-colors relative"
                                   >
-                                    <div className="w-[320px] text-[16px] font-normal truncate">
+                                    <div 
+                                      onClick={() => stClient._id && navigate(`/clients/detail?id=${stClient._id}`)}
+                                      className="w-[320px] text-[16px] font-normal truncate cursor-pointer hover:text-[#2ABAEF]"
+                                    >
                                       {stName}
                                     </div>
 
@@ -364,14 +382,45 @@ export default function Schedule() {
                                       {stPhone}
                                     </div>
 
-                                    <div className="w-[150px]">
-                                      {isPaid ? (
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#22C55E] hover:bg-green-600 rounded-full text-white text-xs font-normal uppercase transition-colors shadow-2xs">
-                                          <span>Оплачено</span>
-                                        </div>
-                                      ) : (
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#3B82F6] hover:bg-blue-600 rounded-full text-white text-xs font-normal uppercase transition-colors shadow-2xs">
-                                          <span>Аванс</span>
+                                    {/* Интерактивная кнопка смены статуса оплаты с выпадающим меню */}
+                                    <div className="w-[150px] relative">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenStatusMenuKey(openStatusMenuKey === itemKey ? null : itemKey);
+                                        }}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-normal uppercase transition-colors shadow-2xs cursor-pointer ${
+                                          paymentSt === "paid"
+                                            ? "bg-[#22C55E] hover:bg-green-600"
+                                            : "bg-[#3B82F6] hover:bg-blue-600"
+                                        }`}
+                                      >
+                                        <span>{paymentSt === "paid" ? "Оплачено" : "Аванс"}</span>
+                                        <ChevronDown className="w-3 h-3 text-white/90" />
+                                      </button>
+
+                                      {openStatusMenuKey === itemKey && (
+                                        <div 
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="absolute left-0 top-9 z-30 w-36 rounded-md bg-white p-1 shadow-xl border border-gray-100 flex flex-col gap-0.5 animate-fadeIn"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() => handleStatusChange(course._id, studentItem._id, "paid")}
+                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                                          >
+                                            <span className="text-[#22C55E] font-medium">Оплачено</span>
+                                            {paymentSt === "paid" && <Check className="w-3.5 h-3.5 text-[#22C55E]" />}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleStatusChange(course._id, studentItem._id, "advance")}
+                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                                          >
+                                            <span className="text-[#3B82F6] font-medium">Аванс</span>
+                                            {paymentSt === "advance" && <Check className="w-3.5 h-3.5 text-[#3B82F6]" />}
+                                          </button>
                                         </div>
                                       )}
                                     </div>
@@ -384,7 +433,10 @@ export default function Schedule() {
                                     <button
                                       type="button"
                                       aria-label="Опции"
-                                      onClick={(e) => e.stopPropagation()}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (stClient._id) navigate(`/clients/detail?id=${stClient._id}`);
+                                      }}
                                       className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
                                     >
                                       <MoreVertical className="w-4 h-4" />
@@ -474,6 +526,7 @@ export default function Schedule() {
         </div>
       </div>
 
+      {/* Модалка: Запись клиента на курс (без выбора статуса оплаты) */}
       {isAddStudentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">
@@ -517,35 +570,6 @@ export default function Schedule() {
                     <option value="">Клиенты не найдены</option>
                   )}
                 </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-xs text-[#576686] font-medium">Статус оплаты</label>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentStatus("paid")}
-                    className={`flex-1 h-11 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                      paymentStatus === "paid"
-                        ? "bg-[#22C55E] text-white shadow-xs"
-                        : "bg-white text-[#576686] border border-gray-200"
-                    }`}
-                  >
-                    Оплачено
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentStatus("advance")}
-                    className={`flex-1 h-11 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                      paymentStatus === "advance"
-                        ? "bg-[#3B82F6] text-white shadow-xs"
-                        : "bg-white text-[#576686] border border-gray-200"
-                    }`}
-                  >
-                    Аванс
-                  </button>
-                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 mt-4">

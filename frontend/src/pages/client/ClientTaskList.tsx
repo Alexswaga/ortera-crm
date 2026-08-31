@@ -73,18 +73,29 @@ const formatDateTime = (dateString?: string | Date) => {
   return `${hours}:${minutes} / ${day}.${month}.${year}`;
 };
 
+const toLocalDateString = (dateInput?: string | Date) => {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function ClientTaskList() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"in_work" | "overdue">("in_work");
+  const [activeTab, setActiveTab] = useState<"in_work" | "overdue" | "archive">("in_work");
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("");
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
 
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const data = await tasksApi.getAll({ status: activeTab });
+      const filterStatus = activeTab === "archive" ? "completed" : activeTab;
+      const data = await tasksApi.getAll({ status: filterStatus });
       setTasks(data);
     } catch (error) {
       console.error("Ошибка загрузки задач клиента:", error);
@@ -117,9 +128,9 @@ export default function ClientTaskList() {
 
   const filteredTasks = tasks.filter((t) => {
     if (!selectedDateFilter) return true;
-    const startIso = t.startDate ? new Date(t.startDate).toISOString().slice(0, 10) : "";
-    const endIso = t.endDate ? new Date(t.endDate).toISOString().slice(0, 10) : "";
-    return startIso === selectedDateFilter || endIso === selectedDateFilter;
+    const startStr = toLocalDateString(t.startDate);
+    const endStr = toLocalDateString(t.endDate);
+    return startStr === selectedDateFilter || endStr === selectedDateFilter;
   });
 
   return (
@@ -151,6 +162,18 @@ export default function ClientTaskList() {
                   }`}
                 >
                   Просроченные
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("archive")}
+                  className={`rounded-[10px] px-5 py-4 text-base transition-all duration-200 cursor-pointer ${
+                    activeTab === "archive"
+                      ? "bg-white text-[#576686] shadow-sm font-medium"
+                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
+                  }`}
+                >
+                  Архив
                 </button>
               </div>
 

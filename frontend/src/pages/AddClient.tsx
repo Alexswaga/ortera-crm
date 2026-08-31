@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, Plus, Copy, X } from "lucide-react";
+import { ChevronDown, Plus, X, Trash2 } from "lucide-react";
 import { clientsApi, managersApi } from "../api/services";
 import { formatCapitalizeWords, formatCapitalizeFirst, formatPhone, formatINN } from "../utils/formatters";
 
@@ -40,7 +40,34 @@ function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: stri
   );
 }
 
+const RUSSIAN_CITIES = [
+  "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань",
+  "Нижний Новгород", "Челябинск", "Красноярск", "Самара", "Уфа",
+  "Ростов-на-Дону", "Краснодар", "Омск", "Воронеж", "Пермь",
+  "Волгоград", "Саратов", "Тюмень", "Тольятти", "Барнаул",
+  "Ижевск", "Ульяновск", "Иркутск", "Хабаровск", "Ярославль",
+  "Владивосток", "Махачкала", "Томск", "Оренбург", "Кемерово",
+  "Новокузнецк", "Рязань", "Набережные Челны", "Астрахань", "Пенза",
+  "Киров", "Липецк", "Чебоксары", "Калининград", "Тула",
+  "Курск", "Ставрополь", "Сочи", "Тверь", "Магнитогорск",
+  "Иваново", "Брянск", "Белгород", "Сургут", "Владимир"
+];
+
 const normalizePhone = (phone: string) => phone.replace(/\D/g, "");
+
+interface IMessengerItem {
+  messenger: string;
+  type: string;
+  url: string;
+}
+
+interface IEmployeeItem {
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  messenger: string;
+}
 
 export default function AddClient() {
   const navigate = useNavigate();
@@ -50,14 +77,12 @@ export default function AddClient() {
 
   const [clientType, setClientType] = useState<"individual" | "company">("individual");
   const [isMessengerModalOpen, setIsMessengerModalOpen] = useState(false);
-  const [messengersList, setMessengersList] = useState<any[]>([
-    { messenger: "МАКС", type: "Ссылка", url: "https://max.ru/" }
-  ]);
+  const [messengersList, setMessengersList] = useState<IMessengerItem[]>([]);
 
-  const [messengerForm, setMessengerForm] = useState({
+  const [messengerForm, setMessengerForm] = useState<IMessengerItem>({
     messenger: "Телеграм",
     type: "Ссылка",
-    url: "https://t.me/username",
+    url: "",
   });
 
   const [managers, setManagers] = useState<any[]>([]);
@@ -80,20 +105,18 @@ export default function AddClient() {
   });
 
   const [formData, setFormData] = useState({
-    inn: "7709359770",
-    orgName: "Стелька Про",
-    fullName: "Николаев Дмитрий Александрович",
+    inn: "",
+    orgName: "",
+    fullName: "",
     activity: "Подолог",
-    city: "Чебоксары",
-    email: "123@ya.ru",
-    phone: "+7 927 668 95 18",
-    maxMessenger: "https://max.ru/",
-    employeeName: "Игнатьева Светлана",
-    employeeRole: "Руководитель",
-    employeePhone: "+7 927 668 95 18",
-    employeeEmail: "123@ya.ru",
-    employeeMessenger: "https://max.ru/usrname4354fgdfd",
+    city: "",
+    email: "",
+    phone: "",
   });
+
+  const [employees, setEmployees] = useState<IEmployeeItem[]>([
+    { name: "", role: "Руководитель", phone: "", email: "", messenger: "" }
+  ]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -113,21 +136,24 @@ export default function AddClient() {
             setSelectedManagerId(c.manager?._id || c.manager || (managersData[0]?._id || ""));
             setFormData({
               inn: c.inn || "",
-              orgName: c.type === "company" ? c.name : "Стелька Про",
-              fullName: c.type === "individual" ? c.name : "Николаев Дмитрий Александрович",
+              orgName: c.type === "company" ? c.name : "",
+              fullName: c.type === "individual" ? c.name : "",
               activity: c.activity || "Подолог",
               city: c.city || "",
               email: c.email || "",
               phone: formatPhone(c.phone || ""),
-              maxMessenger: c.messengers?.[0]?.url || "https://max.ru/",
-              employeeName: c.employees?.[0]?.name || "",
-              employeeRole: c.employees?.[0]?.role || "Руководитель",
-              employeePhone: formatPhone(c.employees?.[0]?.phone || ""),
-              employeeEmail: c.employees?.[0]?.email || "",
-              employeeMessenger: c.employees?.[0]?.messenger || "",
             });
             if (c.messengers && c.messengers.length > 0) {
               setMessengersList(c.messengers);
+            }
+            if (c.employees && c.employees.length > 0) {
+              setEmployees(c.employees.map((emp: any) => ({
+                name: emp.name || "",
+                role: emp.role || "Руководитель",
+                phone: formatPhone(emp.phone || ""),
+                email: emp.email || "",
+                messenger: emp.messenger || "",
+              })));
             }
           }
         } else if (managersData.length > 0) {
@@ -181,6 +207,29 @@ export default function AddClient() {
     });
   }, [formData.phone, formData.email, formData.inn, clientType, allExistingClients, isEditing]);
 
+  const handleAddEmployee = () => {
+    setEmployees((prev) => [
+      ...prev,
+      { name: "", role: "Сотрудник", phone: "", email: "", messenger: "" },
+    ]);
+  };
+
+  const handleRemoveEmployee = (index: number) => {
+    setEmployees((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleEmployeeChange = (index: number, field: keyof IEmployeeItem, value: string) => {
+    setEmployees((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleRemoveMessenger = (index: number) => {
+    setMessengersList((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -192,6 +241,17 @@ export default function AddClient() {
     setIsLoading(true);
 
     try {
+      const validEmployees = employees
+        .filter((emp) => emp.name.trim().length > 0)
+        .map((emp) => ({
+          name: emp.name.trim(),
+          role: emp.role || "Сотрудник",
+          phone: emp.phone.trim(),
+          email: emp.email.trim(),
+          messenger: emp.messenger.trim(),
+        }));
+
+      // Теги создаются пустыми при регистрации нового клиента
       const payload: any = {
         type: clientType,
         name: clientType === "company" ? formData.orgName.trim() : formData.fullName.trim(),
@@ -203,21 +263,9 @@ export default function AddClient() {
         status: "Лид",
         isActive: true,
         isCeased: false,
-        tags: ["Постоянный клиент", "Хороший человек"],
-        messengers: messengersList.map(m => ({
-          messenger: m.messenger,
-          type: m.type,
-          url: m.url || formData.maxMessenger
-        })),
-        employees: clientType === "company" && formData.employeeName ? [
-          {
-            name: formData.employeeName.trim(),
-            role: formData.employeeRole || "Сотрудник",
-            phone: formData.employeePhone.trim(),
-            email: formData.employeeEmail.trim(),
-            messenger: formData.employeeMessenger.trim(),
-          }
-        ] : [],
+        tags: [],
+        messengers: messengersList.filter((m) => m.url.trim().length > 0),
+        employees: clientType === "company" ? validEmployees : [],
       };
 
       if (clientType === "company" && formData.inn) {
@@ -230,7 +278,7 @@ export default function AddClient() {
         await clientsApi.create(payload);
       }
 
-      navigate("/clients");
+      navigate(-1);
     } catch (err: any) {
       console.error("Ошибка сохранения клиента:", err);
     } finally {
@@ -240,18 +288,23 @@ export default function AddClient() {
 
   const handleAddMessengerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (messengerForm.url) {
-      setMessengersList((prev) => [...prev, { ...messengerForm }]);
+    if (messengerForm.url.trim()) {
+      setMessengersList((prev) => [...prev, { ...messengerForm, url: messengerForm.url.trim() }]);
+      setMessengerForm({ messenger: "Телеграм", type: "Ссылка", url: "" });
     }
     setIsMessengerModalOpen(false);
   };
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] relative selection:bg-[#2ABAEF]/20">
+      <datalist id="russian-cities-list">
+        {RUSSIAN_CITIES.map((city) => (
+          <option key={city} value={city} />
+        ))}
+      </datalist>
+
       <div className="mx-auto w-full max-w-[1500px]">
-        
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[781px] flex flex-col justify-between relative shadow-xs">
-          
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
               <h1 className="text-[18px] font-bold text-[#576686] mb-8">
@@ -260,7 +313,6 @@ export default function AddClient() {
 
               {clientType === "company" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-[24px]">
-                  
                   {/* 1. Тип */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
@@ -279,7 +331,7 @@ export default function AddClient() {
                     </div>
                   </div>
 
-                  {/* 2. ИНН (только цифры) */}
+                  {/* 2. ИНН */}
                   <div className="group flex flex-col gap-2">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.innMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -314,6 +366,7 @@ export default function AddClient() {
                         required
                         value={formData.orgName}
                         onChange={(e) => setFormData({ ...formData, orgName: formatCapitalizeFirst(e.target.value) })}
+                        placeholder="Название компании"
                         className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
                       />
                     </div>
@@ -349,10 +402,13 @@ export default function AddClient() {
                       <input
                         type="text"
                         required
+                        list="russian-cities-list"
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: formatCapitalizeWords(e.target.value) })}
+                        placeholder="Выберите или введите город"
                         className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
                       />
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
                     </div>
                   </div>
 
@@ -394,6 +450,7 @@ export default function AddClient() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })}
+                        placeholder="org@example.com"
                         className={`w-full bg-transparent text-base outline-none ${
                           duplicateState.emailMatch ? "text-[#B77C70]" : "text-[#576686] placeholder:text-[#576686]/40"
                         }`}
@@ -401,7 +458,7 @@ export default function AddClient() {
                     </div>
                   </div>
 
-                  {/* 8. Телефон организации */}
+                  {/* 8. Телефон */}
                   <div className="group flex flex-col gap-2 relative">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.phoneMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -445,12 +502,10 @@ export default function AddClient() {
                       </div>
                     )}
                   </div>
-
                 </div>
               ) : (
                 /* Сетка для Физлица */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-[24px]">
-                  
                   {/* 1. Тип */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
@@ -491,7 +546,7 @@ export default function AddClient() {
                     </div>
                   </div>
 
-                  {/* 3. ФИО (с большой буквы) */}
+                  {/* 3. ФИО */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       ФИО
@@ -538,11 +593,13 @@ export default function AddClient() {
                       <input
                         type="text"
                         required
+                        list="russian-cities-list"
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: formatCapitalizeWords(e.target.value) })}
-                        placeholder="Чебоксары"
+                        placeholder="Выберите или введите город"
                         className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
                       />
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
                     </div>
                   </div>
 
@@ -562,6 +619,7 @@ export default function AddClient() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })}
+                        placeholder="client@example.com"
                         className={`w-full bg-transparent text-base outline-none ${
                           duplicateState.emailMatch ? "text-[#B77C70]" : "text-[#576686] placeholder:text-[#576686]/40"
                         }`}
@@ -613,173 +671,178 @@ export default function AddClient() {
                       </div>
                     )}
                   </div>
-
                 </div>
               )}
 
-              {/* Сотрудники */}
+              {/* Блок сотрудников */}
               {clientType === "company" && (
-                <div className="mt-10">
+                <div className="mt-10 animate-fadeIn">
                   <h2 className="text-[18px] font-bold text-[#576686] mb-6">
                     Сотрудники
                   </h2>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-[24px]">
-                    <div className="group flex flex-col gap-2">
-                      <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                        ФИО
-                      </label>
-                      <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                        <input
-                          type="text"
-                          value={formData.employeeName}
-                          onChange={(e) => setFormData({ ...formData, employeeName: formatCapitalizeWords(e.target.value) })}
-                          placeholder="Игнатьева Светлана"
-                          className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group flex flex-col gap-2">
-                      <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                        Должность
-                      </label>
-                      <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                        <select
-                          value={formData.employeeRole}
-                          onChange={(e) => setFormData({ ...formData, employeeRole: e.target.value })}
-                          className="w-full bg-transparent text-xs text-[#576686] outline-none appearance-none cursor-pointer pr-6"
-                        >
-                          <option value="">Выберите должность</option>
-                          <option value="Руководитель">Руководитель</option>
-                          <option value="Врач-подолог">Врач-подолог</option>
-                          <option value="Администратор">Администратор</option>
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
-                      </div>
-                    </div>
-
-                    <div className="group flex flex-col gap-2 relative">
-                      <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                        Телефон
-                      </label>
-                      <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                        <input
-                          type="text"
-                          value={formData.employeePhone}
-                          onChange={(e) => setFormData({ ...formData, employeePhone: formatPhone(e.target.value) })}
-                          placeholder="+7 999 000 00 00"
-                          className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="group flex flex-col gap-2">
-                      <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                        E-mail
-                      </label>
-                      <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                        <input
-                          type="email"
-                          value={formData.employeeEmail}
-                          onChange={(e) => setFormData({ ...formData, employeeEmail: e.target.value.toLowerCase() })}
-                          className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-col gap-2 max-w-[705px]">
-                    <label className="text-xs text-[#576686] font-medium">МАКС</label>
-                    <div className="flex items-center gap-6">
-                      <div className="relative flex-1 group">
-                        <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] pl-4 pr-12 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                          <input
-                            type="text"
-                            value={formData.employeeMessenger}
-                            onChange={(e) => setFormData({ ...formData, employeeMessenger: e.target.value })}
-                            className="w-full bg-transparent text-base text-[#576686] outline-none"
-                          />
-                          <button type="button" className="absolute right-4 text-[#576686]/60 hover:text-[#2ABAEF] transition-colors cursor-pointer">
-                            <Copy className="w-4 h-4" />
+                  <div className="flex flex-col gap-6">
+                    {employees.map((emp, index) => (
+                      <div key={index} className="p-6 rounded-[10px] bg-white border border-gray-100 shadow-xs relative">
+                        {employees.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEmployee(index)}
+                            className="absolute right-4 top-4 text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                            title="Удалить сотрудника"
+                          >
+                            <Trash2 className="size-4" />
                           </button>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-[20px]">
+                          <div className="group flex flex-col gap-2">
+                            <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                              ФИО сотрудника
+                            </label>
+                            <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
+                              <input
+                                type="text"
+                                value={emp.name}
+                                onChange={(e) => handleEmployeeChange(index, "name", formatCapitalizeWords(e.target.value))}
+                                placeholder="Иванов Иван Иванович"
+                                className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="group flex flex-col gap-2">
+                            <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                              Должность
+                            </label>
+                            <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
+                              <select
+                                value={emp.role}
+                                onChange={(e) => handleEmployeeChange(index, "role", e.target.value)}
+                                className="w-full bg-transparent text-xs text-[#576686] outline-none appearance-none cursor-pointer pr-6"
+                              >
+                                <option value="Руководитель">Руководитель</option>
+                                <option value="Врач-подолог">Врач-подолог</option>
+                                <option value="Администратор">Администратор</option>
+                                <option value="Сотрудник">Сотрудник</option>
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
+                            </div>
+                          </div>
+
+                          <div className="group flex flex-col gap-2">
+                            <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                              Телефон
+                            </label>
+                            <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
+                              <input
+                                type="text"
+                                value={emp.phone}
+                                onChange={(e) => handleEmployeeChange(index, "phone", formatPhone(e.target.value))}
+                                placeholder="+7 999 000 00 00"
+                                className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="group flex flex-col gap-2">
+                            <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                              E-mail
+                            </label>
+                            <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
+                              <input
+                                type="email"
+                                value={emp.email}
+                                onChange={(e) => handleEmployeeChange(index, "email", e.target.value.toLowerCase())}
+                                placeholder="employee@example.com"
+                                className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="group flex flex-col gap-2 md:col-span-2">
+                            <label className="text-xs text-[#576686] font-medium">Ссылка на мессенджер сотрудника</label>
+                            <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
+                              <input
+                                type="text"
+                                value={emp.messenger}
+                                onChange={(e) => handleEmployeeChange(index, "messenger", e.target.value)}
+                                placeholder="https://t.me/username или https://max.ru/..."
+                                className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                      <div 
-                        onClick={() => setIsMessengerModalOpen(true)}
-                        className="flex items-center gap-3 cursor-pointer group select-none"
-                      >
-                        <button 
-                          type="button" 
-                          className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                        <span className="text-base text-[#576686] whitespace-nowrap group-hover:text-[#2ABAEF] transition-colors">
-                          Добавить мессенджер
-                        </span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
 
-                  <div className="w-full h-px bg-[rgba(87,102,134,0.3)] my-8" />
-
-                  <div className="flex items-center gap-3 cursor-pointer group w-fit select-none">
+                  <div className="mt-4 flex items-center gap-3 cursor-pointer group w-fit select-none" onClick={handleAddEmployee}>
                     <button type="button" className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer">
                       <Plus className="w-5 h-5" />
                     </button>
-                    <span className="text-base text-[#576686] font-normal group-hover:text-[#2ABAEF] transition-colors">Добавить сотрудника</span>
+                    <span className="text-base text-[#576686] font-normal group-hover:text-[#2ABAEF] transition-colors">
+                      Добавить сотрудника
+                    </span>
                   </div>
                 </div>
               )}
 
-              {/* Мессенджеры для Физлица */}
-              {clientType === "individual" && (
-                <div className="mt-8">
-                  <h2 className="text-[18px] font-bold text-[#576686] mb-6">Мессенджеры</h2>
-                  <div className="flex flex-col gap-2 max-w-[705px]">
-                    <label className="text-xs text-[#576686] font-medium">МАКС</label>
-                    <div className="flex items-center gap-6">
-                      <div className="relative flex-1 group">
-                        <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] pl-4 pr-12 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                          <input
-                            type="text"
-                            value={formData.maxMessenger}
-                            onChange={(e) => setFormData({ ...formData, maxMessenger: e.target.value })}
-                            className="w-full bg-transparent text-base text-[#576686] outline-none"
-                          />
-                          <button type="button" className="absolute right-4 text-[#576686]/60 hover:text-[#2ABAEF] transition-colors cursor-pointer">
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div 
-                        onClick={() => setIsMessengerModalOpen(true)}
-                        className="flex items-center gap-3 cursor-pointer group select-none"
-                      >
-                        <button 
-                          type="button" 
-                          className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                        <span className="text-base text-[#576686] whitespace-nowrap group-hover:text-[#2ABAEF] transition-colors">
-                          Добавить мессенджер
+              {/* Мессенджеры */}
+              <div className="mt-8">
+                <h2 className="text-[18px] font-bold text-[#576686] mb-6">Мессенджеры</h2>
+                <div className="flex flex-col gap-3 max-w-[705px]">
+                  {messengersList.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="relative flex-1 flex items-center h-12 bg-white rounded-md border border-[#576686]/20 px-4">
+                        <span className="text-xs font-semibold text-[#2ABAEF] mr-3 shrink-0">
+                          {item.messenger} ({item.type}):
                         </span>
+                        <input
+                          type="text"
+                          value={item.url}
+                          onChange={(e) => {
+                            const updated = [...messengersList];
+                            updated[idx].url = e.target.value;
+                            setMessengersList(updated);
+                          }}
+                          className="w-full bg-transparent text-sm text-[#576686] outline-none"
+                        />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMessenger(idx)}
+                        className="size-10 flex items-center justify-center rounded-md bg-white border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors cursor-pointer"
+                        title="Удалить мессенджер"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
                     </div>
+                  ))}
+
+                  <div
+                    onClick={() => setIsMessengerModalOpen(true)}
+                    className="flex items-center gap-3 cursor-pointer group select-none mt-2"
+                  >
+                    <button
+                      type="button"
+                      className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                    <span className="text-base text-[#576686] whitespace-nowrap group-hover:text-[#2ABAEF] transition-colors">
+                      Добавить мессенджер
+                    </span>
                   </div>
                 </div>
-              )}
-
+              </div>
             </div>
 
+            {/* Кнопки: «Сохранить и выйти» */}
             <div className="mt-12 flex items-center justify-end gap-4">
               <button
                 type="button"
-                onClick={() => navigate("/clients")}
+                onClick={() => navigate(-1)}
                 className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-white px-5 py-4 text-base text-[#576686] hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800 border border-gray-200 active:scale-[0.98] transition-all duration-150 cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -792,13 +855,11 @@ export default function AddClient() {
                 className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-6 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-medium disabled:opacity-60"
               >
                 <SaveFloppyIcon className="w-4 h-4 text-white" />
-                <span>{isLoading ? "Сохранение..." : "Сохранить"}</span>
+                <span>{isLoading ? "Сохранение..." : "Сохранить и выйти"}</span>
               </button>
             </div>
           </form>
-
         </div>
-
       </div>
 
       {isMessengerModalOpen && (
@@ -857,13 +918,15 @@ export default function AddClient() {
 
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Ссылка
+                    Ссылка / Контакт
                   </label>
                   <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[rgba(87,102,134,0.2)] px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
                     <input
                       type="text"
+                      required
                       value={messengerForm.url}
                       onChange={(e) => setMessengerForm({ ...messengerForm, url: e.target.value })}
+                      placeholder="https://t.me/... или номер"
                       className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
                     />
                   </div>
@@ -888,13 +951,10 @@ export default function AddClient() {
                   <span>Добавить мессенджер</span>
                 </button>
               </div>
-
             </form>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

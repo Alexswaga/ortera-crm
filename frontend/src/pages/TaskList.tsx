@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MoreVertical, Calendar, Check, Clock, Trash2, ChevronDown } from "lucide-react";
+import { MoreVertical, Calendar, Check, Clock, Trash2, ChevronDown, User, X } from "lucide-react";
 import { tasksApi, managersApi } from "../api/services";
 
 function CreateTaskDocIcon({ className = "w-4 h-4 text-white" }: { className?: string }) {
@@ -68,12 +68,23 @@ const formatDateTime = (dateString?: string | Date) => {
   return `${hours}:${minutes} / ${day}.${month}.${year}`;
 };
 
+const toLocalDateString = (dateInput?: string | Date) => {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function TaskList() {
   const navigate = useNavigate();
 
   const [tasks, setTasks] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [selectedManagerFilter, setSelectedManagerFilter] = useState<string>("");
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"in_work" | "overdue" | "archive">("in_work");
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
@@ -121,10 +132,17 @@ export default function TaskList() {
     }
   };
 
+  const filteredTasks = tasks.filter((t) => {
+    if (!selectedDateFilter) return true;
+    const startStr = toLocalDateString(t.startDate);
+    const endStr = toLocalDateString(t.endDate);
+    return startStr === selectedDateFilter || endStr === selectedDateFilter;
+  });
+
   return (
-    <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter']">
+    <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
-        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[500px] flex flex-col justify-start">
+        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[500px] flex flex-col justify-start shadow-xs">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
               <div className="flex items-center gap-3">
@@ -165,38 +183,54 @@ export default function TaskList() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 text-xs text-[#576686]">
+              <div className="flex items-center gap-4">
+                {/* Рабочий интерактивный календарный фильтр */}
+                <div className="flex items-center gap-2 text-xs text-[#576686] bg-white px-3.5 py-2.5 rounded-md border border-gray-200 shadow-xs">
                   <span>Интервал дат:</span>
-                  <span className="text-[#2ABAEF] font-medium flex items-center gap-1">
-                    19.07.2026
-                    <Calendar className="w-3 h-3" />
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={selectedDateFilter}
+                      onChange={(e) => setSelectedDateFilter(e.target.value)}
+                      className="text-[#2ABAEF] font-medium bg-transparent outline-none cursor-pointer text-xs"
+                    />
+                    {selectedDateFilter ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDateFilter("")}
+                        title="Сбросить фильтр даты"
+                        className="size-4 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 cursor-pointer"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    ) : (
+                      <Calendar className="w-3.5 h-3.5 text-[#2ABAEF] pointer-events-none" />
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-[#576686] relative">
-                  <span>Менеджер:</span>
-                  <div className="relative inline-block">
-                    <select
-                      value={selectedManagerFilter}
-                      onChange={(e) => setSelectedManagerFilter(e.target.value)}
-                      className="bg-transparent text-[#2ABAEF] font-medium appearance-none pr-5 outline-none cursor-pointer"
-                    >
-                      <option value="">Все менеджеры</option>
-                      {managers.map((m) => (
-                        <option key={m._id} value={m._id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-[#2ABAEF] absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
+                {/* Селектор менеджера */}
+                <div className="relative flex items-center h-10 rounded-md bg-white border border-gray-200 px-3 shadow-xs hover:border-gray-300 transition-colors">
+                  <User className="w-3.5 h-3.5 text-[#576686]/60 mr-2 shrink-0 pointer-events-none" />
+                  <select
+                    value={selectedManagerFilter}
+                    onChange={(e) => setSelectedManagerFilter(e.target.value)}
+                    className="bg-transparent text-xs text-[#576686] font-medium pr-6 outline-none cursor-pointer appearance-none"
+                  >
+                    <option value="">Все менеджеры</option>
+                    {managers.map((m) => (
+                      <option key={m._id} value={m._id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#576686]/60 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
                 <button
                   type="button"
                   onClick={() => navigate("/create-task")}
-                  className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-5 py-4 text-base text-white hover:bg-[#576686]/90 transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-5 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-normal"
                 >
                   <CreateTaskDocIcon />
                   <span>Создать задачу</span>
@@ -206,11 +240,11 @@ export default function TaskList() {
 
             {loading ? (
               <div className="flex flex-col items-center justify-center h-96 text-[#576686]/60">
-                <p className="text-base">Загрузка задач...</p>
+                <p className="text-base font-medium">Загрузка задач...</p>
               </div>
-            ) : tasks.length > 0 ? (
+            ) : filteredTasks.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {tasks.map((task) => {
+                {filteredTasks.map((task) => {
                   const isOverdue = task.status === "overdue";
                   const clientType = task.client?.type || "user";
                   const clientName = task.client?.name || "Клиент не указан";
@@ -224,7 +258,7 @@ export default function TaskList() {
                     <div
                       key={task._id}
                       onClick={() => navigate(clientId ? `/clients/detail?id=${clientId}` : "/clients")}
-                      className="relative flex flex-col justify-between rounded-[10px] bg-white p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-[264px] cursor-pointer"
+                      className="relative flex flex-col justify-between rounded-[10px] bg-white p-6 border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2ABAEF]/40 hover:-translate-y-0.5 transition-all duration-150 h-[264px] cursor-pointer group"
                     >
                       <div className="relative">
                         <button
@@ -242,7 +276,7 @@ export default function TaskList() {
                         {activeMenuTaskId === task._id && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-9 z-30 w-44 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1"
+                            className="absolute right-0 top-9 z-30 w-44 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn"
                           >
                             <button
                               type="button"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { X } from "lucide-react";
+import { X, Calendar } from "lucide-react";
 import { scheduleApi } from "../../api/services";
 
 function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: string }) {
@@ -39,8 +39,6 @@ export default function ClientAddEvent() {
 
   const [formData, setFormData] = useState({
     startDate: "10.08.2026",
-    startTime: "10:00",
-    endTime: "12:00",
     endDate: "11.08.2026",
     location: "Чебоксары",
     title: "Курс: Производство каркасных стелек",
@@ -61,8 +59,6 @@ export default function ClientAddEvent() {
         if (currentEvent) {
           setFormData({
             startDate: currentEvent.startDate || "",
-            startTime: currentEvent.startTime || "10:00",
-            endTime: currentEvent.endTime || "12:00",
             endDate: currentEvent.endDate || "",
             location: currentEvent.location || "",
             title: currentEvent.title || "",
@@ -88,9 +84,9 @@ export default function ClientAddEvent() {
         title: formData.title.trim(),
         location: formData.location.trim(),
         startDate: formData.startDate.trim(),
-        startTime: formData.startTime.trim(),
+        startTime: "",
         endDate: formData.endDate.trim(),
-        endTime: formData.endTime.trim(),
+        endTime: "",
       };
 
       if (isEditing && eventId) {
@@ -110,9 +106,7 @@ export default function ClientAddEvent() {
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
-        
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[384px] flex flex-col justify-between shadow-xs">
-          
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
               <h1 className="text-[18px] font-bold text-[#576686] mb-8">
@@ -126,52 +120,39 @@ export default function ClientAddEvent() {
               )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-[30px] gap-y-6 mb-6">
-                
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Дата
+                    Даты проведения
                   </label>
                   
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="text"
-                      required
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      placeholder="ДД.ММ.ГГГГ"
-                      className="w-36 h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                    />
-
-                    <input
-                      type="text"
-                      required
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      placeholder="00:00"
-                      className="w-36 h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                    />
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        placeholder="С (ДД.ММ.ГГГГ)"
+                        className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
+                      />
+                      <Calendar className="size-4 text-[#576686]/40 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
 
                     <span className="text-base text-[#576686] px-1 select-none font-normal">
                       по
                     </span>
 
-                    <input
-                      type="text"
-                      required
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      placeholder="00:00"
-                      className="w-36 h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                    />
-
-                    <input
-                      type="text"
-                      required
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      placeholder="ДД.ММ.ГГГГ"
-                      className="w-36 h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        required
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        placeholder="По (ДД.ММ.ГГГГ)"
+                        className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
+                      />
+                      <Calendar className="size-4 text-[#576686]/40 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
 
@@ -184,10 +165,10 @@ export default function ClientAddEvent() {
                     required
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="Город проведения"
                     className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
                   />
                 </div>
-
               </div>
 
               <div className="group flex flex-col gap-2">
@@ -199,6 +180,7 @@ export default function ClientAddEvent() {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Название обучающего курса"
                   className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
                 />
               </div>
@@ -224,9 +206,7 @@ export default function ClientAddEvent() {
               </button>
             </div>
           </form>
-
         </div>
-
       </div>
     </div>
   );
