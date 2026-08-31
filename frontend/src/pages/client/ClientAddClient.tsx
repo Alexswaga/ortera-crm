@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronDown, Plus, X, Ban, Trash2 } from "lucide-react";
 import { clientsApi } from "../../api/services";
 import { formatCapitalizeWords, formatCapitalizeFirst, formatPhone, formatINN } from "../../utils/formatters";
+import CitySuggestInput from "../../components/CitySuggestInput";
 
 function ManagerIcon() {
   return (
@@ -39,19 +40,6 @@ function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: stri
     </svg>
   );
 }
-
-const RUSSIAN_CITIES = [
-  "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань",
-  "Нижний Новгород", "Челябинск", "Красноярск", "Самара", "Уфа",
-  "Ростов-на-Дону", "Краснодар", "Омск", "Воронеж", "Пермь",
-  "Волгоград", "Саратов", "Тюмень", "Тольятти", "Барнаул",
-  "Ижевск", "Ульяновск", "Иркутск", "Хабаровск", "Ярославль",
-  "Владивосток", "Махачкала", "Томск", "Оренбург", "Кемерово",
-  "Новокузнецк", "Рязань", "Набережные Челны", "Астрахань", "Пенза",
-  "Киров", "Липецк", "Чебоксары", "Калининград", "Тула",
-  "Курск", "Ставрополь", "Сочи", "Тверь", "Магнитогорск",
-  "Иваново", "Брянск", "Белгород", "Сургут", "Владимир"
-];
 
 const normalizePhone = (phone: string) => phone.replace(/\D/g, "");
 
@@ -249,7 +237,6 @@ export default function ClientAddClient() {
           messenger: emp.messenger.trim(),
         }));
 
-      // Теги создаются пустыми
       const payload: any = {
         type: clientType,
         name: clientType === "company" ? formData.orgName.trim() : formData.fullName.trim(),
@@ -294,12 +281,6 @@ export default function ClientAddClient() {
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] relative selection:bg-[#2ABAEF]/20">
-      <datalist id="russian-cities-client-list">
-        {RUSSIAN_CITIES.map((city) => (
-          <option key={city} value={city} />
-        ))}
-      </datalist>
-
       <div className="mx-auto w-full max-w-[1500px]">
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 shadow-xs flex flex-col justify-between min-h-[674px]">
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
@@ -366,23 +347,17 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 4. Город */}
+                  {/* 4. Город с живым поиском */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                      Город
+                      Город / Населенный пункт
                     </label>
-                    <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[#576686]/20 px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                      <input
-                        type="text"
-                        required
-                        list="russian-cities-client-list"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: formatCapitalizeWords(e.target.value) })}
-                        placeholder="Выберите или введите город"
-                        className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
-                      />
-                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
-                    </div>
+                    <CitySuggestInput
+                      required
+                      value={formData.city}
+                      onChange={(val) => setFormData({ ...formData, city: val })}
+                      placeholder="Начните вводить город или область..."
+                    />
                   </div>
 
                   {/* 5. E-mail */}
@@ -537,23 +512,17 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 5. Город */}
+                  {/* 5. Город с живым поиском */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                      Город
+                      Город / Населенный пункт
                     </label>
-                    <div className="relative flex items-center w-full h-12 bg-white rounded-md border border-[#576686]/20 px-4 transition-all duration-200 hover:border-[#576686]/60 focus-within:border-[#2ABAEF] focus-within:ring-4 focus-within:ring-[#2ABAEF]/15">
-                      <input
-                        type="text"
-                        required
-                        list="russian-cities-client-list"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: formatCapitalizeWords(e.target.value) })}
-                        placeholder="Выберите или введите город"
-                        className="w-full bg-transparent text-base text-[#576686] outline-none placeholder:text-[#576686]/40"
-                      />
-                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[#576686]/60 group-hover:text-[#576686] group-focus-within:text-[#2ABAEF] transition-colors" />
-                    </div>
+                    <CitySuggestInput
+                      required
+                      value={formData.city}
+                      onChange={(val) => setFormData({ ...formData, city: val })}
+                      placeholder="Начните вводить город или область..."
+                    />
                   </div>
 
                   {/* 6. E-mail */}
