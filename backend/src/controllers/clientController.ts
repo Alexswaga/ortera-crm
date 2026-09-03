@@ -6,7 +6,7 @@ import { Note } from "../models/Note";
 // 1. Получение списка клиентов
 export const getClients = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { type, status, search, isActive } = req.query;
+    const { type, status, search, isActive, wantsToLearn } = req.query;
     const filter: Record<string, any> = {};
     const authUser = (req as any).user;
 
@@ -17,6 +17,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
     if (type) filter.type = String(type);
     if (status) filter.status = String(status);
     if (isActive !== undefined) filter.isActive = isActive === "true";
+    if (wantsToLearn !== undefined) filter.wantsToLearn = wantsToLearn === "true";
 
     if (search) {
       const searchStr = String(search);
@@ -89,7 +90,6 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
     const cleanEmail = clientData.email ? clientData.email.toLowerCase().trim() : "";
     const cleanInn = clientData.inn ? clientData.inn.trim() : "";
 
-    // Поиск совпадений по телефону, email или ИНН
     const duplicateConditions: any[] = [];
     if (cleanPhone && cleanPhone.length >= 7) {
       duplicateConditions.push({ phone: { $regex: cleanPhone.slice(-7) } });

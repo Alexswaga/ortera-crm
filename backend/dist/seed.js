@@ -1,0 +1,193 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const node_dns_1 = __importDefault(require("node:dns"));
+node_dns_1.default.setServers(["8.8.8.8", "1.1.1.1"]);
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const mongoose_1 = __importDefault(require("mongoose"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const User_1 = require("./models/User");
+const Client_1 = require("./models/Client");
+const Task_1 = require("./models/Task");
+const ScheduleEvent_1 = require("./models/ScheduleEvent");
+const Setting_1 = require("./models/Setting");
+const seedDatabase = async () => {
+    try {
+        const mongoUri = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/ortera_crm";
+        console.log("[Seed] Подключение к MongoDB...");
+        await mongoose_1.default.connect(mongoUri);
+        console.log("[Seed] Успешно подключено к базе данных!");
+        console.log("[Seed] Очистка старых данных...");
+        await Promise.all([
+            User_1.User.deleteMany({}),
+            Client_1.Client.deleteMany({}),
+            Task_1.Task.deleteMany({}),
+            ScheduleEvent_1.ScheduleEvent.deleteMany({}),
+            Setting_1.Setting.deleteMany({}),
+        ]);
+        console.log("[Seed] Создание пользователей...");
+        const salt = await bcryptjs_1.default.genSalt(10);
+        const passwordHash = await bcryptjs_1.default.hash("admin123", salt);
+        const [admin, manager, clientUser] = await User_1.User.create([
+            {
+                name: "Администратор Ortera",
+                email: "admin@ya.ru",
+                password: passwordHash,
+                role: "admin",
+                phone: "+7 900 000 00 00",
+            },
+            {
+                name: "Иванова Настя",
+                email: "nastya@ya.ru",
+                password: passwordHash,
+                role: "manager",
+                phone: "+7 927 668 95 18",
+            },
+            {
+                name: "Николаев Дмитрий",
+                email: "client@ya.ru",
+                password: passwordHash,
+                role: "client",
+                phone: "+7 927 668 95 18",
+            },
+        ]);
+        console.log("[Seed] Создание клиентов...");
+        const [clientIndividual, clientCompany] = await Client_1.Client.create([
+            {
+                type: "individual",
+                name: "Николаев Дмитрий Александрович",
+                activity: "Подолог",
+                city: "Чебоксары",
+                email: "123@ya.ru",
+                phone: "+7 927 668 95 18",
+                manager: manager._id,
+                status: "Лид",
+                isActive: true,
+                isCeased: false,
+                tags: [
+                    "Использует стельки других производителей",
+                    "Постоянный клиент",
+                    "Хороший человек",
+                    "Пианист",
+                    "Любит вино",
+                    "Танцует и поет",
+                ],
+                messengers: [
+                    { messenger: "МАКС", type: "Ссылка", url: "https://max.ru/" },
+                ],
+            },
+            {
+                type: "company",
+                name: "Стелька Про",
+                inn: "7709359770",
+                activity: "Ортопедическая клиника",
+                city: "Чебоксары",
+                email: "org@ya.ru",
+                phone: "+7 927 668 95 18",
+                manager: manager._id,
+                status: "Покупатель",
+                isActive: true,
+                isCeased: false,
+                tags: [
+                    "Использует стельки других производителей",
+                    "Наш студент",
+                    "Постоянный клиент",
+                ],
+                messengers: [
+                    { messenger: "МАКС", type: "Ссылка", url: "https://max.ru/company" },
+                ],
+                employees: [
+                    {
+                        name: "Игнатьева Светлана",
+                        role: "Руководитель",
+                        phone: "+7 927 668 95 18",
+                        email: "123@ya.ru",
+                        messenger: "https://max.ru/usrname4354fgdfd",
+                    },
+                ],
+            },
+        ]);
+        console.log("[Seed] Создание задач...");
+        await Task_1.Task.create([
+            {
+                title: "Связаться с клиентом Николаевым Д. А. для уточнения информации. Уточнить по оплате, запросить акт выполненных ...",
+                description: "Уточнить по оплате и запросить акт выполненных работ",
+                client: clientCompany._id,
+                manager: manager._id,
+                type: "Звонок",
+                startDate: new Date("2026-07-16T14:28:00"),
+                endDate: new Date("2026-07-17T10:00:00"),
+                status: "in_work",
+                hasLightning: true,
+            },
+            {
+                title: "Связаться с клиентом Николаевым Д. А. для уточнения информации. Уточнить по оплате, запросить акт выполненных ...",
+                description: "Плановый созвон",
+                client: clientIndividual._id,
+                manager: manager._id,
+                type: "Звонок",
+                startDate: new Date("2026-07-16T14:28:00"),
+                endDate: new Date("2026-07-17T10:00:00"),
+                status: "in_work",
+                hasLightning: false,
+            },
+            {
+                title: "Отправить КП по стелькам",
+                description: "Отправить коммерческое предложение на почту",
+                client: clientIndividual._id,
+                manager: manager._id,
+                type: "Отправить КП",
+                startDate: new Date("2026-07-16T14:28:00"),
+                endDate: new Date("2026-07-17T10:00:00"),
+                status: "overdue",
+                hasLightning: false,
+            },
+        ]);
+        console.log("[Seed] Создание обучающих курсов...");
+        await ScheduleEvent_1.ScheduleEvent.create([
+            {
+                title: "Курс: Производство каркасных стелек",
+                location: "Чебоксары",
+                startDate: "16.07.2026",
+                startTime: "10:00",
+                endDate: "17.07.2026",
+                endTime: "18:00",
+                students: [
+                    { client: clientIndividual._id, paymentStatus: "paid", manager: manager._id },
+                    { client: clientIndividual._id, paymentStatus: "advance", manager: manager._id },
+                ],
+            },
+        ]);
+        console.log("[Seed] Создание настроек...");
+        const tags = [
+            "Использует стельки других производителей",
+            "Наш студент",
+            "Постоянный клиент",
+            "Хороший человек",
+            "Пианист",
+            "Любит вино",
+            "Танцует и поет",
+        ];
+        const specialties = [
+            "Ортопедическая клиника",
+            "Подолог",
+            "Врач ЛФК",
+            "Травматолог-ортопед",
+            "Массажист",
+        ];
+        await Promise.all([
+            ...tags.map((name) => Setting_1.Setting.create({ type: "tag", name })),
+            ...specialties.map((name) => Setting_1.Setting.create({ type: "specialty", name })),
+        ]);
+        console.log("[Seed] База данных успешно заполнена тестовыми данными!");
+        process.exit(0);
+    }
+    catch (error) {
+        console.error("[Seed] Ошибка наполнения базы:", error);
+        process.exit(1);
+    }
+};
+seedDatabase();

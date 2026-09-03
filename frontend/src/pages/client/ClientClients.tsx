@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserPlus, Phone, Building, User as UserIconLucide } from "lucide-react";
+import { UserPlus, Phone, Building, User as UserIconLucide, X, GraduationCap } from "lucide-react";
 import { clientsApi, settingsApi } from "../../api/services";
 
 function ManagerRowIcon({ className = "w-4 h-4 text-[#576686]/60 shrink-0" }: { className?: string }) {
@@ -26,25 +26,17 @@ function EditRowIcon({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
-const defaultTagsList = [
-  "Использует стельки других производителей",
-  "Наш студент",
-  "Постоянный клиент",
-  "Хороший человек",
-  "Пианист",
-  "Любит вино",
-  "Танцует и поет",
-];
-
 export default function ClientClients() {
   const navigate = useNavigate();
 
   const [clients, setClients] = useState<any[]>([]);
-  const [tagsList, setTagsList] = useState<string[]>(defaultTagsList);
+  const [tagsList, setTagsList] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<"all" | "orgs" | "private">("all");
-  const [selectedTag, setSelectedTag] = useState<string>("");
+  // 4 вкладки: "all" | "orgs" | "private" | "wants_to_learn"
+  const [activeTab, setActiveTab] = useState<"all" | "orgs" | "private" | "wants_to_learn">("all");
+  // Мультивыбор тегов
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -70,15 +62,25 @@ export default function ClientClients() {
     fetchInitialData();
   }, []);
 
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
   const filteredClients = clients.filter((client) => {
     const isCompany = client.type === "company";
 
+    // Фильтр по вкладкам
     if (activeTab === "orgs" && !isCompany) return false;
     if (activeTab === "private" && isCompany) return false;
+    if (activeTab === "wants_to_learn" && !client.wantsToLearn) return false;
 
-    if (selectedTag) {
+    // Мультивыбор тегов
+    if (selectedTags.length > 0) {
       const clientTags = client.tags || [];
-      if (!clientTags.includes(selectedTag)) return false;
+      const hasAnySelected = selectedTags.some((t) => clientTags.includes(t));
+      if (!hasAnySelected) return false;
     }
 
     return true;
@@ -90,6 +92,7 @@ export default function ClientClients() {
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[500px] flex flex-col justify-start shadow-xs">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              {/* 4 вкладки: Все | Организации | Частники | Желающие обучаться */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -126,6 +129,19 @@ export default function ClientClients() {
                 >
                   Частники
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("wants_to_learn")}
+                  className={`rounded-[10px] px-5 py-4 text-base font-normal transition-all duration-200 cursor-pointer flex items-center gap-2 ${
+                    activeTab === "wants_to_learn"
+                      ? "bg-[#576686] text-white shadow-sm font-medium"
+                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  <span>Желающие обучаться</span>
+                </button>
               </div>
 
               <button
@@ -138,22 +154,40 @@ export default function ClientClients() {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 mb-8">
-              {tagsList.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => setSelectedTag(selectedTag === tag ? "" : tag)}
-                  className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer border ${
-                    selectedTag === tag
-                      ? "bg-[#576686] text-white border-[#576686] shadow-xs"
-                      : "bg-white text-[#576686] border-[#576686]/20 hover:border-[#576686]/50"
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
+            {/* Мультивыбор тегов с кнопкой сброса (крестик) */}
+            {tagsList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2.5 mb-8">
+                {tagsList.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer border ${
+                        isSelected
+                          ? "bg-[#576686] text-white border-[#576686] shadow-xs font-medium"
+                          : "bg-white text-[#576686] border-[#576686]/20 hover:border-[#576686]/50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+
+                {/* Крестик сброса выбранных тегов */}
+                {selectedTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTags([])}
+                    title="Сбросить выбранные теги"
+                    className="size-7 rounded-full bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-500 flex items-center justify-center text-[#576686] transition-all cursor-pointer shadow-xs ml-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Заголовки таблицы: Столбец Телефон */}
             <div className="flex items-center px-6 mb-3 text-[12px] text-[#576686]">
@@ -194,9 +228,16 @@ export default function ClientClients() {
                               <UserIconLucide className="w-4 h-4 text-[#576686]" />
                             )}
                           </div>
-                          <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
-                            {client.name}
-                          </span>
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
+                              {client.name}
+                            </span>
+                            {client.wantsToLearn && (
+                              <span title="Желает обучаться" className="inline-flex items-center text-[#2ABAEF] shrink-0">
+                                <GraduationCap className="size-4" />
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Столбец Телефон */}

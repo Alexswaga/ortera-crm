@@ -13,7 +13,8 @@ export interface IScheduleEvent extends Document {
   startTime: string; // "10:00"
   endDate: string;   // "11.08.2026"
   endTime: string;   // "12:00"
-  manager?: Types.ObjectId; // Менеджер-автор события
+  maxStudents: number; // <-- Количество доступных мест на курсе
+  manager?: Types.ObjectId;
   students: IEventStudent[];
   createdAt: Date;
   updatedAt: Date;
@@ -24,9 +25,10 @@ const ScheduleEventSchema = new Schema<IScheduleEvent>(
     title: { type: String, required: true, trim: true },
     location: { type: String, required: true, trim: true },
     startDate: { type: String, required: true },
-    startTime: { type: String, required: true },
+    startTime: { type: String, default: "" },
     endDate: { type: String, required: true },
-    endTime: { type: String, required: true },
+    endTime: { type: String, default: "" },
+    maxStudents: { type: Number, default: 10 },
     manager: { type: Schema.Types.ObjectId, ref: "User" },
     students: [
       {

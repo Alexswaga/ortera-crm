@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { ScheduleEvent } from "../models/ScheduleEvent";
 
-// 1. Получение событий графика — список дат и событий общий для всех пользователей
+// 1. Получение событий графика обучения
 export const getScheduleEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const events = await ScheduleEvent.find()
@@ -15,10 +15,10 @@ export const getScheduleEvents = async (req: Request, res: Response): Promise<vo
   }
 };
 
-// 2. Создание события
+// 2. Создание события (доступно и менеджеру, и администратору)
 export const createScheduleEvent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, location, startDate, startTime, endDate, endTime } = req.body;
+    const { title, location, startDate, startTime, endDate, endTime, maxStudents } = req.body;
     const authUser = (req as any).user;
 
     const event = await ScheduleEvent.create({
@@ -28,6 +28,7 @@ export const createScheduleEvent = async (req: Request, res: Response): Promise<
       startTime: startTime || "",
       endDate,
       endTime: endTime || "",
+      maxStudents: maxStudents ? Number(maxStudents) : 10,
       manager: authUser?.role === "manager" ? (authUser.id || authUser._id) : undefined,
       students: [],
     });
@@ -42,7 +43,12 @@ export const createScheduleEvent = async (req: Request, res: Response): Promise<
 export const updateScheduleEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const updated = await ScheduleEvent.findByIdAndUpdate(id, req.body, { new: true })
+    const updateData = { ...req.body };
+    if (updateData.maxStudents) {
+      updateData.maxStudents = Number(updateData.maxStudents);
+    }
+
+    const updated = await ScheduleEvent.findByIdAndUpdate(id, updateData, { new: true })
       .populate("students.client", "name activity city phone manager")
       .populate("students.manager", "name");
 
@@ -88,7 +94,7 @@ export const addStudentToEvent = async (req: Request, res: Response): Promise<vo
   }
 };
 
-// 5. Изменение статуса оплаты ученика в событии
+// 5. Изменение статуса оплаты ученика
 export const updateStudentPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, studentId } = req.params;
@@ -120,7 +126,35 @@ export const updateStudentPaymentStatus = async (req: Request, res: Response): P
   }
 };
 
-// 6. Удаление события
+// 6. Удаление ученика из курса (по значку корзины)
+export const removeStudentFromEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { eventId, studentId } = req.params;
+
+    const event = await ScheduleEvent.findById(eventId);
+    if (!event) {
+      res.status(404).json({ message: "Событие не найдено" });
+      return;
+    }
+
+    event.students = event.students.filter(
+      (s: any) => s._id.toString() !== studentId && s.client?.toString() !== studentId
+    );
+
+    await event.save();
+
+    const populated = await event.populate([
+      { path: "students.client", select: "name activity city phone manager" },
+      { path: "students.manager", select: "name" },
+    ]);
+
+    res.json(populated);
+  } catch (error) {
+    res.status(400).json({ message: "Ошибка при удалении ученика с курса", error });
+  }
+};
+
+// 7. Удаление события
 export const deleteScheduleEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

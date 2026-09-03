@@ -16,9 +16,9 @@ export interface IEmployee {
 
 export interface IClient extends Document {
   type: "individual" | "company";
-  name: string; // ФИО или Название организации
+  name: string;
   inn?: string;
-  activity: string; // "Подолог", "Ортопедическая клиника" и т.д.
+  activity: string;
   city: string;
   email?: string;
   phone?: string;
@@ -26,7 +26,8 @@ export interface IClient extends Document {
   manager?: Types.ObjectId;
   status: "Лид" | "Покупатель";
   isActive: boolean;
-  isCeased: boolean; // Прекратил деятельность
+  isCeased: boolean;
+  wantsToLearn: boolean; // <-- Чекбокс «Желающий обучаться»
   tags: string[];
   employees: IEmployee[];
   lastContactDate: Date;
@@ -54,6 +55,7 @@ const ClientSchema = new Schema<IClient>(
     status: { type: String, enum: ["Лид", "Покупатель"], default: "Лид" },
     isActive: { type: Boolean, default: true },
     isCeased: { type: Boolean, default: false },
+    wantsToLearn: { type: Boolean, default: false },
     tags: [{ type: String, trim: true }],
     employees: [
       {

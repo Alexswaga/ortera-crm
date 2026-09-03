@@ -5,6 +5,7 @@ import {
   updateScheduleEvent,
   addStudentToEvent,
   updateStudentPaymentStatus,
+  removeStudentFromEvent,
   deleteScheduleEvent,
 } from "../controllers/scheduleController";
 import { requireAuth } from "../middlewares/auth";
@@ -18,6 +19,7 @@ router.post("/", createScheduleEvent);
 router.put("/:id", updateScheduleEvent);
 router.post("/:id/students", addStudentToEvent);
 router.patch("/:eventId/students/:studentId/status", updateStudentPaymentStatus);
+router.delete("/:eventId/students/:studentId", removeStudentFromEvent);
 router.delete("/:id", deleteScheduleEvent);
 
 export default router;

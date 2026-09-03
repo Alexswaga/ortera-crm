@@ -8,7 +8,8 @@ import {
   MoreVertical,
   X,
   Search,
-  Check
+  Check,
+  Trash2
 } from "lucide-react";
 import { scheduleApi, clientsApi } from "../api/services";
 
@@ -90,10 +91,8 @@ export default function Schedule() {
   const [currentYear, setCurrentYear] = useState(2026);
   const [loading, setLoading] = useState(true);
 
-  // Выпадающее меню изменения статуса оплаты
   const [openStatusMenuKey, setOpenStatusMenuKey] = useState<string | null>(null);
 
-  // Модалка записи клиента
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [targetCourseId, setTargetCourseId] = useState<string | null>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -159,6 +158,16 @@ export default function Schedule() {
       console.error("Ошибка добавления студента на курс:", err);
     } finally {
       setIsSubmittingStudent(false);
+    }
+  };
+
+  const handleRemoveStudent = async (courseId: string, studentId: string) => {
+    if (!window.confirm("Удалить клиента из списка участников курса?")) return;
+    try {
+      await scheduleApi.removeStudent(courseId, studentId);
+      await loadSchedule();
+    } catch (err) {
+      console.error("Ошибка удаления студента:", err);
     }
   };
 
@@ -282,11 +291,12 @@ export default function Schedule() {
 
             {viewMode === "list" && (
               <div>
+                {/* Шапка таблицы: Город выровнен влево */}
                 <div className="flex items-center px-8 mb-3 text-[12px] text-[#576686]">
                   <div className="w-[350px]">Дата</div>
                   <div className="flex-1 pl-4">Название курса</div>
-                  <div className="w-[180px]">Город</div>
-                  <div className="w-[180px] text-right"></div>
+                  <div className="w-[200px] text-left">Город</div>
+                  <div className="w-[160px] text-right"></div>
                 </div>
 
                 {loading ? (
@@ -301,6 +311,8 @@ export default function Schedule() {
                         ? course.startDate
                         : `${course.startDate} - ${course.endDate}`;
                       const studentsList = course.students || [];
+                      const maxStudents = course.maxStudents ? Number(course.maxStudents) : 10;
+                      const freeSlotsCount = Math.max(0, maxStudents - studentsList.length);
 
                       return (
                         <div
@@ -316,14 +328,15 @@ export default function Schedule() {
                               {course.title}
                             </div>
 
-                            <div className="w-[180px] text-[12px]">
+                            {/* Крупный город по левому краю */}
+                            <div className="w-[200px] text-[18px] font-bold text-[#576686] text-left truncate">
                               {course.location || "Чебоксары"}
                             </div>
 
                             <div className="flex items-center gap-4">
-                              <div className="h-7 px-3.5 bg-[#576686] rounded-full flex items-center justify-center gap-2 text-white text-[10px] shadow-xs">
+                              <div className="h-7 px-3.5 bg-[#576686] rounded-full flex items-center justify-center gap-2 text-white text-[11px] shadow-xs">
                                 <UserBadgeIcon className="w-3.5 h-3.5 text-white" />
-                                <span className="font-medium">{studentsList.length}</span>
+                                <span className="font-medium">{studentsList.length}/{maxStudents}</span>
                               </div>
 
                               <button
@@ -352,6 +365,7 @@ export default function Schedule() {
 
                           {isOpened && (
                             <div className="px-8 pb-8 flex flex-col gap-3 border-t border-gray-50 pt-4 animate-fadeIn">
+                              {/* 1. Занятые места (ученики) */}
                               {studentsList.map((studentItem: any, idx: number) => {
                                 const stClient = studentItem.client || {};
                                 const stManager = studentItem.manager || {};
@@ -369,21 +383,21 @@ export default function Schedule() {
                                   >
                                     <div 
                                       onClick={() => stClient._id && navigate(`/clients/detail?id=${stClient._id}`)}
-                                      className="w-[320px] text-[16px] font-normal truncate cursor-pointer hover:text-[#2ABAEF]"
+                                      className="w-[300px] text-[16px] font-normal truncate cursor-pointer hover:text-[#2ABAEF]"
                                     >
                                       {stName}
                                     </div>
 
-                                    <div className="w-[200px] text-[12px]">
+                                    <div className="w-[190px] text-[12px]">
                                       {stRole}
                                     </div>
 
-                                    <div className="w-[180px] text-[12px]">
+                                    <div className="w-[170px] text-[12px]">
                                       {stPhone}
                                     </div>
 
-                                    {/* Интерактивная кнопка смены статуса оплаты с выпадающим меню */}
-                                    <div className="w-[150px] relative">
+                                    {/* Статус оплаты */}
+                                    <div className="w-[140px] relative">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -425,36 +439,62 @@ export default function Schedule() {
                                       )}
                                     </div>
 
-                                    <div className="w-[180px] flex items-center gap-2 text-[12px] text-[#576686]">
+                                    <div className="w-[160px] flex items-center gap-2 text-[12px] text-[#576686]">
                                       <ManagerRowIcon className="w-4 h-4 text-[#576686]/60" />
-                                      <span>{stManagerName}</span>
+                                      <span className="truncate">{stManagerName}</span>
                                     </div>
 
-                                    <button
-                                      type="button"
-                                      aria-label="Опции"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (stClient._id) navigate(`/clients/detail?id=${stClient._id}`);
-                                      }}
-                                      className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
-                                    >
-                                      <MoreVertical className="w-4 h-4" />
-                                    </button>
+                                    {/* Корзина для удаления студента */}
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveStudent(course._id, studentItem._id)}
+                                        title="Удалить студента с курса"
+                                        className="size-8 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        aria-label="Профиль клиента"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (stClient._id) navigate(`/clients/detail?id=${stClient._id}`);
+                                        }}
+                                        className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })}
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAddStudent(course._id)}
-                                className="flex items-center gap-3 mt-4 text-[#576686] hover:text-[#2ABAEF] transition-colors group cursor-pointer w-fit select-none"
-                              >
-                                <div className="size-12 rounded-[10px] bg-[#F5F7FA] group-hover:bg-[#2ABAEF]/10 flex items-center justify-center transition-colors shadow-2xs">
-                                  <Plus className="w-4 h-4" />
+                              {/* 2. Свободные места: Первый слот с кнопкой добавления */}
+                              {freeSlotsCount > 0 && (
+                                <div
+                                  onClick={() => handleOpenAddStudent(course._id)}
+                                  className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none group"
+                                >
+                                  <div className="size-6 rounded-md bg-[#576686]/10 group-hover:bg-[#2ABAEF]/20 flex items-center justify-center mr-3 transition-colors">
+                                    <Plus className="w-4 h-4 text-[#576686] group-hover:text-[#2ABAEF]" />
+                                  </div>
+                                  <span className="text-[15px] font-medium">Записать клиента на этот курс</span>
                                 </div>
-                                <span className="text-[16px] font-normal">Записать клиента на этот курс</span>
-                              </button>
+                              )}
+
+                              {/* 3. Остальные пустые слоты (по макету с черными рамками) */}
+                              {freeSlotsCount > 1 &&
+                                Array.from({ length: freeSlotsCount - 1 }).map((_, slotIdx) => (
+                                  <div
+                                    key={`empty-slot-${slotIdx}`}
+                                    onClick={() => handleOpenAddStudent(course._id)}
+                                    className="flex items-center h-14 px-5 rounded-[10px] border border-dashed border-gray-300 bg-white/50 text-gray-400 hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none"
+                                  >
+                                    <span className="text-xs">Свободное место ({studentsList.length + slotIdx + 2}/{maxStudents})</span>
+                                  </div>
+                                ))}
                             </div>
                           )}
                         </div>
@@ -526,7 +566,7 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Модалка: Запись клиента на курс (без выбора статуса оплаты) */}
+      {/* Модалка: Запись клиента на курс */}
       {isAddStudentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">

@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const clientController_1 = require("../controllers/clientController");
+const auth_1 = require("../middlewares/auth");
+const router = (0, express_1.Router)();
+router.use(auth_1.requireAuth);
+router.get("/", clientController_1.getClients);
+router.get("/:id", clientController_1.getClientById);
+router.post("/", clientController_1.createClient);
+router.put("/:id", clientController_1.updateClient);
+router.patch("/:id/toggle-active", clientController_1.toggleClientActive);
+router.post("/:id/notes", clientController_1.addClientNote);
+exports.default = router;

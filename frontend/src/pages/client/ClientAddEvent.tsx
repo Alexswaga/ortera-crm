@@ -42,6 +42,7 @@ export default function ClientAddEvent() {
     endDate: "11.08.2026",
     location: "Чебоксары",
     title: "Курс: Производство каркасных стелек",
+    maxStudents: 10,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +63,7 @@ export default function ClientAddEvent() {
             endDate: currentEvent.endDate || "",
             location: currentEvent.location || "",
             title: currentEvent.title || "",
+            maxStudents: currentEvent.maxStudents ? Number(currentEvent.maxStudents) : 10,
           });
         }
       } catch (err) {
@@ -87,6 +89,7 @@ export default function ClientAddEvent() {
         startTime: "",
         endDate: formData.endDate.trim(),
         endTime: "",
+        maxStudents: Number(formData.maxStudents) || 10,
       };
 
       if (isEditing && eventId) {
@@ -106,7 +109,7 @@ export default function ClientAddEvent() {
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
-        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[384px] flex flex-col justify-between shadow-xs">
+        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[420px] flex flex-col justify-between shadow-xs">
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
               <h1 className="text-[18px] font-bold text-[#576686] mb-8">
@@ -158,7 +161,7 @@ export default function ClientAddEvent() {
 
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Место
+                    Место (Город)
                   </label>
                   <input
                     type="text"
@@ -171,18 +174,36 @@ export default function ClientAddEvent() {
                 </div>
               </div>
 
-              <div className="group flex flex-col gap-2">
-                <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                  Название
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Название обучающего курса"
-                  className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-[30px] gap-y-6">
+                <div className="group flex flex-col gap-2 lg:col-span-2">
+                  <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                    Название курса
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Название обучающего курса"
+                    className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
+                  />
+                </div>
+
+                <div className="group flex flex-col gap-2">
+                  <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                    Количество мест на курсе
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    required
+                    value={formData.maxStudents}
+                    onChange={(e) => setFormData({ ...formData, maxStudents: Number(e.target.value) })}
+                    placeholder="10"
+                    className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
+                  />
+                </div>
               </div>
             </div>
 

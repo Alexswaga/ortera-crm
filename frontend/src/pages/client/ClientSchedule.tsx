@@ -9,7 +9,8 @@ import {
   X,
   Search,
   Check,
-  User
+  User,
+  Trash2
 } from "lucide-react";
 import { scheduleApi, clientsApi } from "../../api/services";
 
@@ -55,41 +56,16 @@ const weekDays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 const parseEventDate = (dStr?: string | Date): Date | null => {
   if (!dStr) return null;
-  if (dStr instanceof Date) {
-    const d = new Date(dStr);
-    d.setHours(0, 0, 0, 0);
-    return isNaN(d.getTime()) ? null : d;
-  }
+  if (dStr instanceof Date) return isNaN(dStr.getTime()) ? null : dStr;
   if (typeof dStr === "string") {
-    const clean = dStr.trim();
-    if (clean.includes(".")) {
-      const parts = clean.split(/\s+/)[0].split(".");
+    if (dStr.includes(".")) {
+      const parts = dStr.trim().split(/\s+/)[0].split(".");
       if (parts.length === 3) {
-        const day = Number(parts[0]);
-        const month = Number(parts[1]) - 1;
-        let year = Number(parts[2]);
-        if (year < 100) year += 2000;
-        const d = new Date(year, month, day);
-        d.setHours(0, 0, 0, 0);
-        return isNaN(d.getTime()) ? null : d;
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
       }
     }
-    if (clean.includes("-")) {
-      const parts = clean.split(/\s+/)[0].split("T")[0].split("-");
-      if (parts.length === 3) {
-        const year = Number(parts[0]);
-        const month = Number(parts[1]) - 1;
-        const day = Number(parts[2]);
-        const d = new Date(year, month, day);
-        d.setHours(0, 0, 0, 0);
-        return isNaN(d.getTime()) ? null : d;
-      }
-    }
-    const parsed = new Date(clean);
-    if (!isNaN(parsed.getTime())) {
-      parsed.setHours(0, 0, 0, 0);
-      return parsed;
-    }
+    const parsed = new Date(dStr);
+    return isNaN(parsed.getTime()) ? null : parsed;
   }
   return null;
 };
@@ -103,10 +79,8 @@ export default function ClientSchedule() {
   const [activeMenuStudentId, setActiveMenuStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Меню изменения статуса оплаты
   const [openStatusMenuKey, setOpenStatusMenuKey] = useState<string | null>(null);
 
-  // Модалка записи клиента
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [targetCourseId, setTargetCourseId] = useState<string | null>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -175,6 +149,16 @@ export default function ClientSchedule() {
     }
   };
 
+  const handleRemoveStudent = async (courseId: string, studentId: string) => {
+    if (!window.confirm("Удалить клиента из списка участников курса?")) return;
+    try {
+      await scheduleApi.removeStudent(courseId, studentId);
+      await loadSchedule();
+    } catch (err) {
+      console.error("Ошибка удаления студента:", err);
+    }
+  };
+
   const handleStatusChange = async (courseId: string, studentId: string, newStatus: string) => {
     try {
       setOpenStatusMenuKey(null);
@@ -190,10 +174,7 @@ export default function ClientSchedule() {
     const firstDayIndex = new Date(currentYear, monthIndex, 1).getDay();
     const startOffset = (firstDayIndex + 6) % 7;
 
-    const highlightedMap: Record<
-      number,
-      { isSingle: boolean; isRange: boolean; isStart: boolean; isEnd: boolean }
-    > = {};
+    const highlightedMap: Record<number, { isSingle: boolean; isRange: boolean; isStart: boolean; isEnd: boolean }> = {};
 
     courses.forEach((course) => {
       const start = parseEventDate(course.startDate);
@@ -286,6 +267,7 @@ export default function ClientSchedule() {
                 )}
               </div>
 
+              {/* Менеджер тоже может создавать события */}
               <button
                 type="button"
                 onClick={() => navigate("/client/schedule/add")}
@@ -296,14 +278,13 @@ export default function ClientSchedule() {
               </button>
             </div>
 
-            {/* СПИСОК КУРСОВ */}
             {viewMode === "list" && (
               <div>
                 <div className="flex items-center px-8 mb-3 text-[12px] text-[#576686]">
                   <div className="w-[350px]">Дата</div>
                   <div className="flex-1 pl-4">Название курса</div>
-                  <div className="w-[180px]">Город</div>
-                  <div className="w-[180px] text-right"></div>
+                  <div className="w-[200px] text-left">Город</div>
+                  <div className="w-[160px] text-right"></div>
                 </div>
 
                 {loading ? (
@@ -318,6 +299,8 @@ export default function ClientSchedule() {
                         ? course.startDate
                         : `${course.startDate} - ${course.endDate}`;
                       const studentsList = course.students || [];
+                      const maxStudents = course.maxStudents ? Number(course.maxStudents) : 10;
+                      const freeSlotsCount = Math.max(0, maxStudents - studentsList.length);
 
                       return (
                         <div
@@ -333,14 +316,15 @@ export default function ClientSchedule() {
                               {course.title}
                             </div>
 
-                            <div className="w-[180px] text-[12px]">
+                            {/* Крупный город по левому краю */}
+                            <div className="w-[200px] text-[18px] font-bold text-[#576686] text-left truncate">
                               {course.location || "Чебоксары"}
                             </div>
 
                             <div className="flex items-center gap-4">
-                              <div className="h-7 px-3.5 bg-[#576686] rounded-full flex items-center justify-center gap-2 text-white text-[10px] shadow-xs">
+                              <div className="h-7 px-3.5 bg-[#576686] rounded-full flex items-center justify-center gap-2 text-white text-[11px] shadow-xs">
                                 <UserBadgeIcon className="w-3.5 h-3.5 text-white" />
-                                <span className="font-medium">{studentsList.length}</span>
+                                <span className="font-medium">{studentsList.length}/{maxStudents}</span>
                               </div>
 
                               <button
@@ -369,6 +353,7 @@ export default function ClientSchedule() {
 
                           {isOpened && (
                             <div className="px-8 pb-8 flex flex-col gap-3 border-t border-gray-50 pt-4 animate-fadeIn">
+                              {/* 1. Занятые места (ученики) */}
                               {studentsList.map((studentItem: any, idx: number) => {
                                 const stClient = studentItem.client || {};
                                 const stName = stClient.name || "Клиент";
@@ -390,16 +375,16 @@ export default function ClientSchedule() {
                                       {stName}
                                     </div>
 
-                                    <div className="w-[220px] text-[12px]">
+                                    <div className="w-[200px] text-[12px]">
                                       {stRole}
                                     </div>
 
-                                    <div className="w-[200px] text-[12px]">
+                                    <div className="w-[180px] text-[12px]">
                                       {stPhone}
                                     </div>
 
-                                    {/* Интерактивная смена статуса оплаты */}
-                                    <div className="w-[150px] relative">
+                                    {/* Статус оплаты */}
+                                    <div className="w-[140px] relative">
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -441,49 +426,75 @@ export default function ClientSchedule() {
                                       )}
                                     </div>
 
-                                    <div className="relative">
+                                    {/* Корзина и меню */}
+                                    <div className="flex items-center gap-1">
                                       <button
                                         type="button"
-                                        onClick={() => setActiveMenuStudentId(activeMenuStudentId === studentKey ? null : studentKey)}
-                                        aria-label="Опции"
-                                        className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
+                                        onClick={() => handleRemoveStudent(course._id, studentItem._id)}
+                                        title="Удалить студента с курса"
+                                        className="size-8 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
                                       >
-                                        <MoreVertical className="w-4 h-4" />
+                                        <Trash2 className="w-4 h-4" />
                                       </button>
 
-                                      {activeMenuStudentId === studentKey && (
-                                        <div 
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="absolute right-0 top-8 z-30 w-40 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn"
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveMenuStudentId(activeMenuStudentId === studentKey ? null : studentKey)}
+                                          aria-label="Опции"
+                                          className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
                                         >
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setActiveMenuStudentId(null);
-                                              navigate(`/client/clients/detail?id=${stClient._id || ""}`);
-                                            }}
-                                            className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm text-left cursor-pointer"
+                                          <MoreVertical className="w-4 h-4" />
+                                        </button>
+
+                                        {activeMenuStudentId === studentKey && (
+                                          <div 
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute right-0 top-8 z-30 w-40 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn"
                                           >
-                                            <User className="w-3.5 h-3.5" />
-                                            <span>Профиль</span>
-                                          </button>
-                                        </div>
-                                      )}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setActiveMenuStudentId(null);
+                                                navigate(`/client/clients/detail?id=${stClient._id || ""}`);
+                                              }}
+                                              className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm text-left cursor-pointer"
+                                            >
+                                              <User className="w-3.5 h-3.5" />
+                                              <span>Профиль</span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 );
                               })}
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAddStudent(course._id)}
-                                className="flex items-center gap-3 mt-4 text-[#576686] hover:text-[#2ABAEF] transition-colors group cursor-pointer w-fit select-none"
-                              >
-                                <div className="size-12 rounded-[10px] bg-[#F5F7FA] group-hover:bg-[#2ABAEF]/10 flex items-center justify-center transition-colors shadow-2xs">
-                                  <Plus className="w-4 h-4" />
+                              {/* 2. Первый свободный слот */}
+                              {freeSlotsCount > 0 && (
+                                <div
+                                  onClick={() => handleOpenAddStudent(course._id)}
+                                  className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none group"
+                                >
+                                  <div className="size-6 rounded-md bg-[#576686]/10 group-hover:bg-[#2ABAEF]/20 flex items-center justify-center mr-3 transition-colors">
+                                    <Plus className="w-4 h-4 text-[#576686] group-hover:text-[#2ABAEF]" />
+                                  </div>
+                                  <span className="text-[15px] font-medium">Записать клиента на этот курс</span>
                                 </div>
-                                <span className="text-[16px] font-normal">Записать клиента на этот курс</span>
-                              </button>
+                              )}
+
+                              {/* 3. Остальные пустые слоты */}
+                              {freeSlotsCount > 1 &&
+                                Array.from({ length: freeSlotsCount - 1 }).map((_, slotIdx) => (
+                                  <div
+                                    key={`empty-slot-${slotIdx}`}
+                                    onClick={() => handleOpenAddStudent(course._id)}
+                                    className="flex items-center h-14 px-5 rounded-[10px] border border-dashed border-gray-300 bg-white/50 text-gray-400 hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none"
+                                  >
+                                    <span className="text-xs">Свободное место ({studentsList.length + slotIdx + 2}/{maxStudents})</span>
+                                  </div>
+                                ))}
                             </div>
                           )}
                         </div>
@@ -559,7 +570,7 @@ export default function ClientSchedule() {
         </div>
       </div>
 
-      {/* Модалка: Запись клиента на курс (без выбора статуса оплаты) */}
+      {/* Модалка: Запись клиента на курс */}
       {isAddStudentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">

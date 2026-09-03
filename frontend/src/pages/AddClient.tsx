@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, Plus, X, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, X, Trash2, GraduationCap } from "lucide-react";
 import { clientsApi, managersApi } from "../api/services";
 import { formatCapitalizeWords, formatCapitalizeFirst, formatPhone, formatINN } from "../utils/formatters";
 import CitySuggestInput from "../components/CitySuggestInput";
@@ -64,6 +64,7 @@ export default function AddClient() {
   const isEditing = Boolean(clientId);
 
   const [clientType, setClientType] = useState<"individual" | "company">("individual");
+  const [wantsToLearn, setWantsToLearn] = useState(false);
   const [isMessengerModalOpen, setIsMessengerModalOpen] = useState(false);
   const [messengersList, setMessengersList] = useState<IMessengerItem[]>([]);
 
@@ -121,6 +122,7 @@ export default function AddClient() {
           const c = clientDetails.client;
           if (c) {
             setClientType(c.type || "individual");
+            setWantsToLearn(Boolean(c.wantsToLearn));
             setSelectedManagerId(c.manager?._id || c.manager || (managersData[0]?._id || ""));
             setFormData({
               inn: c.inn || "",
@@ -247,6 +249,7 @@ export default function AddClient() {
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         manager: selectedManagerId || undefined,
+        wantsToLearn: Boolean(wantsToLearn),
         status: "Лид",
         isActive: true,
         isCeased: false,
@@ -288,9 +291,25 @@ export default function AddClient() {
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[781px] flex flex-col justify-between relative shadow-xs">
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
-              <h1 className="text-[18px] font-bold text-[#576686] mb-8">
-                {isEditing ? "Редактирование клиента" : "Добавление клиента"}
-              </h1>
+              <div className="flex items-center justify-between mb-8">
+                <h1 className="text-[18px] font-bold text-[#576686]">
+                  {isEditing ? "Редактирование клиента" : "Добавление клиента"}
+                </h1>
+
+                {/* Чекбокс «Желающий обучаться» */}
+                <label className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-md border border-gray-200 cursor-pointer hover:border-[#2ABAEF] transition-all select-none shadow-2xs">
+                  <input
+                    type="checkbox"
+                    checked={wantsToLearn}
+                    onChange={(e) => setWantsToLearn(e.target.checked)}
+                    className="size-4.5 rounded border-gray-300 text-[#2ABAEF] focus:ring-[#2ABAEF] cursor-pointer accent-[#2ABAEF]"
+                  />
+                  <GraduationCap className={`size-4 transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]/60"}`} />
+                  <span className={`text-sm font-medium transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]"}`}>
+                    Желающий обучаться
+                  </span>
+                </label>
+              </div>
 
               {clientType === "company" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-[24px]">
@@ -374,7 +393,7 @@ export default function AddClient() {
                     </div>
                   </div>
 
-                  {/* 5. Город с живым выпадающим геокодером */}
+                  {/* 5. Город */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Город / Населенный пункт
@@ -559,7 +578,7 @@ export default function AddClient() {
                     </div>
                   </div>
 
-                  {/* 5. Город с живым выпадающим геокодером */}
+                  {/* 5. Город */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Город / Населенный пункт
@@ -746,18 +765,22 @@ export default function AddClient() {
                     ))}
                   </div>
 
-                  <div className="mt-4 flex items-center gap-3 cursor-pointer group w-fit select-none" onClick={handleAddEmployee}>
-                    <button type="button" className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer">
+                  <button 
+                    type="button" 
+                    onClick={handleAddEmployee}
+                    className="mt-4 inline-flex items-center gap-3 cursor-pointer group select-none"
+                  >
+                    <div className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150">
                       <Plus className="w-5 h-5" />
-                    </button>
+                    </div>
                     <span className="text-base text-[#576686] font-normal group-hover:text-[#2ABAEF] transition-colors">
                       Добавить сотрудника
                     </span>
-                  </div>
+                  </button>
                 </div>
               )}
 
-              {/* Мессенджеры */}
+              {/* Мессенджеры: кнопка добавления сделана изолированной (w-fit) */}
               <div className="mt-8">
                 <h2 className="text-[18px] font-bold text-[#576686] mb-6">Мессенджеры</h2>
                 <div className="flex flex-col gap-3 max-w-[705px]">
@@ -789,19 +812,20 @@ export default function AddClient() {
                     </div>
                   ))}
 
-                  <div
-                    onClick={() => setIsMessengerModalOpen(true)}
-                    className="flex items-center gap-3 cursor-pointer group select-none mt-2"
-                  >
+                  {/* Изолированная кнопка добавления мессенджера (клик в пустоту теперь не срабатывает) */}
+                  <div className="mt-2 flex">
                     <button
                       type="button"
-                      className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150 cursor-pointer"
+                      onClick={() => setIsMessengerModalOpen(true)}
+                      className="inline-flex items-center gap-3 cursor-pointer group select-none w-fit"
                     >
-                      <Plus className="w-5 h-5" />
+                      <div className="size-12 rounded-md bg-[#576686] text-white flex items-center justify-center group-hover:bg-[#475470] group-hover:shadow-xs active:scale-95 transition-all duration-150">
+                        <Plus className="w-5 h-5" />
+                      </div>
+                      <span className="text-base text-[#576686] whitespace-nowrap group-hover:text-[#2ABAEF] transition-colors font-normal">
+                        Добавить мессенджер
+                      </span>
                     </button>
-                    <span className="text-base text-[#576686] whitespace-nowrap group-hover:text-[#2ABAEF] transition-colors">
-                      Добавить мессенджер
-                    </span>
                   </div>
                 </div>
               </div>

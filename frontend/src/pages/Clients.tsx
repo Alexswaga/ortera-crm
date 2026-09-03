@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, Building, User as UserIconLucide } from "lucide-react";
-import { clientsApi } from "../api/services";
+import { Phone, Building, User as UserIconLucide, X, GraduationCap } from "lucide-react";
+import { clientsApi, settingsApi } from "../api/services";
 
 function PlusIcon() {
   return (
@@ -38,17 +38,25 @@ function EditRowIcon({ className = "w-4 h-4" }: { className?: string }) {
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<any[]>([]);
+  const [tagsList, setTagsList] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Два независимых фильтра
-  const [typeFilter, setTypeFilter] = useState<"all" | "orgs" | "private">("all");
+  // Фильтры
+  const [typeFilter, setTypeFilter] = useState<"all" | "orgs" | "private" | "wants_to_learn">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  const loadClients = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
-      const data = await clientsApi.getAll();
-      setClients(data);
+      const [clientsData, settingsData] = await Promise.all([
+        clientsApi.getAll(),
+        settingsApi.getAll("tag").catch(() => []),
+      ]);
+      setClients(clientsData);
+      if (settingsData && settingsData.length > 0) {
+        setTagsList(settingsData.map((item: any) => item.name));
+      }
     } catch (error) {
       console.error("Ошибка при загрузке клиентов:", error);
     } finally {
@@ -57,7 +65,7 @@ export default function Clients() {
   };
 
   useEffect(() => {
-    loadClients();
+    loadInitialData();
   }, []);
 
   const toggleClientActive = async (id: string, e: React.MouseEvent) => {
@@ -72,14 +80,28 @@ export default function Clients() {
     }
   };
 
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
   const filteredClients = clients.filter((client) => {
-    // 1. Фильтр по типу
+    // 1. Фильтр по категориям / вкладкам
     if (typeFilter === "orgs" && client.type !== "company") return false;
     if (typeFilter === "private" && client.type === "company") return false;
+    if (typeFilter === "wants_to_learn" && !client.wantsToLearn) return false;
 
-    // 2. Фильтр по активности (независимый)
+    // 2. Фильтр по активности
     if (statusFilter === "active" && !client.isActive) return false;
     if (statusFilter === "inactive" && client.isActive) return false;
+
+    // 3. Мультивыбор тегов
+    if (selectedTags.length > 0) {
+      const clientTags = client.tags || [];
+      const hasAnySelected = selectedTags.some((t) => clientTags.includes(t));
+      if (!hasAnySelected) return false;
+    }
 
     return true;
   });
@@ -89,9 +111,10 @@ export default function Clients() {
       <div className="mx-auto w-full max-w-[1500px]">
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[500px] flex flex-col justify-start shadow-xs">
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            {/* Панель фильтров и кнопка создания */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div className="flex flex-wrap items-center gap-6">
-                {/* Группа 1: Тип клиента */}
+                {/* 4 вкладки: Все | Организации | Частники | Желающие обучаться */}
                 <div className="flex items-center gap-2 bg-white/60 p-1 rounded-[12px] border border-gray-200">
                   <button
                     type="button"
@@ -126,9 +149,21 @@ export default function Clients() {
                   >
                     Частники
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setTypeFilter("wants_to_learn")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                      typeFilter === "wants_to_learn"
+                        ? "bg-[#576686] text-white shadow-xs font-medium"
+                        : "text-[#576686] hover:bg-white"
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                    <span>Желающие обучаться</span>
+                  </button>
                 </div>
 
-                {/* Группа 2: Активность (независимая) */}
+                {/* Фильтр по активности */}
                 <div className="flex items-center gap-2 bg-white/60 p-1 rounded-[12px] border border-gray-200">
                   <button
                     type="button"
@@ -169,14 +204,49 @@ export default function Clients() {
               <button
                 type="button"
                 onClick={() => navigate("/clients/add")}
-                className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] pt-4 pb-[17px] pl-3 pr-5 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer"
+                className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] pt-4 pb-[17px] pl-3 pr-5 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-normal"
               >
                 <PlusIcon />
                 <span>Добавить клиента</span>
               </button>
             </div>
 
-            {/* Заголовки таблицы: Вместо Даты регистрации теперь Телефон */}
+            {/* Мультивыбор тегов с кнопкой сброса (крестик) */}
+            {tagsList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2.5 mb-8">
+                {tagsList.map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`px-4 py-1.5 rounded-full text-xs transition-all duration-150 cursor-pointer border ${
+                        isSelected
+                          ? "bg-[#576686] text-white border-[#576686] shadow-xs font-medium"
+                          : "bg-white text-[#576686] border-[#576686]/20 hover:border-[#576686]/50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+
+                {/* Крестик сброса выбранных тегов */}
+                {selectedTags.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTags([])}
+                    title="Сбросить выбранные теги"
+                    className="size-7 rounded-full bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-500 flex items-center justify-center text-[#576686] transition-all cursor-pointer shadow-xs ml-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Заголовки таблицы */}
             <div className="flex items-center px-6 mb-3 text-[12px] text-[#576686]">
               <div className="w-[338px] pl-6">ФИО</div>
               <div className="w-[171px]">Телефон</div>
@@ -215,9 +285,16 @@ export default function Clients() {
                               <UserIconLucide className="w-4 h-4 text-[#576686]" />
                             )}
                           </div>
-                          <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
-                            {client.name}
-                          </span>
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="text-[16px] font-normal truncate group-hover:text-[#2ABAEF] transition-colors">
+                              {client.name}
+                            </span>
+                            {client.wantsToLearn && (
+                              <span title="Желает обучаться" className="inline-flex items-center text-[#2ABAEF] shrink-0">
+                                <GraduationCap className="size-4" />
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Столбец Телефон */}

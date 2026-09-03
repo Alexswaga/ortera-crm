@@ -25,7 +25,7 @@ export const authApi = {
 
 // 2. Клиенты и заметки
 export const clientsApi = {
-  getAll: async (params?: { type?: string; status?: string; search?: string; isActive?: boolean }) => {
+  getAll: async (params?: { type?: string; status?: string; search?: string; isActive?: boolean; wantsToLearn?: boolean }) => {
     const { data } = await api.get("/clients", { params });
     return data;
   },
@@ -119,6 +119,10 @@ export const scheduleApi = {
   },
   updateStudentStatus: async (eventId: string, studentId: string, paymentStatus: string) => {
     const { data } = await api.patch(`/schedule/${eventId}/students/${studentId}/status`, { paymentStatus });
+    return data;
+  },
+  removeStudent: async (eventId: string, studentId: string) => {
+    const { data } = await api.delete(`/schedule/${eventId}/students/${studentId}`);
     return data;
   },
   delete: async (id: string) => {

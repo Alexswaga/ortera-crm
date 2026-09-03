@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { Setting } from "../models/Setting";
+import { Client } from "../models/Client";
 
-// 1. Получение всех настроек (разделенных на tags и specialties)
+// 1. Получение всех настроек (теги / специальности)
 export const getSettings = async (req: Request, res: Response): Promise<void> => {
   try {
     const { type } = req.query;
@@ -13,7 +14,7 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// 2. Создание настройки (тег или специальность)
+// 2. Создание настройки
 export const createSetting = async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, name } = req.body;
@@ -35,9 +36,21 @@ export const updateSetting = async (req: Request, res: Response): Promise<void> 
     const { id } = req.params;
     const { name } = req.body;
 
+    const oldSetting = await Setting.findById(id);
+    const newName = String(name).trim();
+
+    if (oldSetting && oldSetting.type === "tag" && oldSetting.name !== newName) {
+      // Обновляем тег у всех клиентов, у которых он был указан
+      await Client.updateMany(
+        { tags: oldSetting.name },
+        { $set: { "tags.$[elem]": newName } },
+        { arrayFilters: [{ elem: oldSetting.name }] }
+      );
+    }
+
     const setting = await Setting.findByIdAndUpdate(
       id,
-      { name: String(name).trim() },
+      { name: newName },
       { new: true }
     );
 
@@ -52,11 +65,23 @@ export const updateSetting = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// 4. Удаление настройки
+// 4. Удаление настройки с автоматической очисткой тегов у клиентов
 export const deleteSetting = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    await Setting.findByIdAndDelete(id);
+    const setting = await Setting.findById(id);
+
+    if (setting) {
+      if (setting.type === "tag") {
+        // Удаляем этот тег из массива tags у всех клиентов
+        await Client.updateMany(
+          { tags: setting.name },
+          { $pull: { tags: setting.name } }
+        );
+      }
+      await Setting.findByIdAndDelete(id);
+    }
+
     res.json({ message: "Элемент удален" });
   } catch (error) {
     res.status(500).json({ message: "Ошибка при удалении", error });
