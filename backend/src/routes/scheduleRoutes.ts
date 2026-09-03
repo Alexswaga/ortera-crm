@@ -3,6 +3,7 @@ import {
   getScheduleEvents,
   createScheduleEvent,
   updateScheduleEvent,
+  toggleArchiveScheduleEvent,
   addStudentToEvent,
   updateStudentPaymentStatus,
   removeStudentFromEvent,
@@ -17,6 +18,7 @@ router.use(requireAuth);
 router.get("/", getScheduleEvents);
 router.post("/", createScheduleEvent);
 router.put("/:id", updateScheduleEvent);
+router.patch("/:id/toggle-archive", toggleArchiveScheduleEvent);
 router.post("/:id/students", addStudentToEvent);
 router.patch("/:eventId/students/:studentId/status", updateStudentPaymentStatus);
 router.delete("/:eventId/students/:studentId", removeStudentFromEvent);

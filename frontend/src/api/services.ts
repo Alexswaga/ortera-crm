@@ -1,6 +1,5 @@
 import api from "./axios";
 
-// 1. Авторизация
 export const authApi = {
   login: async (credentials: { email: string; password: string }) => {
     const { data } = await api.post("/auth/login", credentials);
@@ -23,7 +22,6 @@ export const authApi = {
   },
 };
 
-// 2. Клиенты и заметки
 export const clientsApi = {
   getAll: async (params?: { type?: string; status?: string; search?: string; isActive?: boolean; wantsToLearn?: boolean }) => {
     const { data } = await api.get("/clients", { params });
@@ -51,7 +49,6 @@ export const clientsApi = {
   },
 };
 
-// 3. Задачи
 export const tasksApi = {
   getAll: async (params?: { status?: string; managerId?: string }) => {
     const { data } = await api.get("/tasks", { params });
@@ -75,7 +72,6 @@ export const tasksApi = {
   },
 };
 
-// 4. Менеджеры
 export const managersApi = {
   getAll: async () => {
     const { data } = await api.get("/managers");
@@ -99,10 +95,9 @@ export const managersApi = {
   },
 };
 
-// 5. График обучения (Расписание)
 export const scheduleApi = {
-  getAll: async () => {
-    const { data } = await api.get("/schedule");
+  getAll: async (params?: { isArchived?: boolean }) => {
+    const { data } = await api.get("/schedule", { params });
     return data;
   },
   create: async (eventData: any) => {
@@ -111,6 +106,10 @@ export const scheduleApi = {
   },
   update: async (id: string, eventData: any) => {
     const { data } = await api.put(`/schedule/${id}`, eventData);
+    return data;
+  },
+  toggleArchive: async (id: string) => {
+    const { data } = await api.patch(`/schedule/${id}/toggle-archive`);
     return data;
   },
   addStudent: async (eventId: string, payload: { clientId: string; paymentStatus?: string }) => {
@@ -131,18 +130,17 @@ export const scheduleApi = {
   },
 };
 
-// 6. Настройки (Теги и Специальности)
 export const settingsApi = {
-  getAll: async (type?: "tag" | "specialty") => {
+  getAll: async (type?: "tag" | "specialty" | "course_type") => {
     const { data } = await api.get("/settings", { params: { type } });
     return data;
   },
-  create: async (payload: { type: "tag" | "specialty"; name: string }) => {
+  create: async (payload: { type: "tag" | "specialty" | "course_type"; name: string; maxStudents?: number }) => {
     const { data } = await api.post("/settings", payload);
     return data;
   },
-  update: async (id: string, name: string) => {
-    const { data } = await api.put(`/settings/${id}`, { name });
+  update: async (id: string, payload: { name?: string; maxStudents?: number }) => {
+    const { data } = await api.put(`/settings/${id}`, payload);
     return data;
   },
   delete: async (id: string) => {

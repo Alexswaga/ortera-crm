@@ -9,11 +9,12 @@ export interface IEventStudent {
 export interface IScheduleEvent extends Document {
   title: string;
   location: string;
-  startDate: string; // "10.08.2026"
-  startTime: string; // "10:00"
-  endDate: string;   // "11.08.2026"
-  endTime: string;   // "12:00"
-  maxStudents: number; // <-- Количество доступных мест на курсе
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  maxStudents: number;
+  isArchived: boolean; // <-- Флаг архива
   manager?: Types.ObjectId;
   students: IEventStudent[];
   createdAt: Date;
@@ -29,6 +30,7 @@ const ScheduleEventSchema = new Schema<IScheduleEvent>(
     endDate: { type: String, required: true },
     endTime: { type: String, default: "" },
     maxStudents: { type: Number, default: 10 },
+    isArchived: { type: Boolean, default: false }, // <-- По умолчанию активный
     manager: { type: Schema.Types.ObjectId, ref: "User" },
     students: [
       {

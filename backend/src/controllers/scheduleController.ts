@@ -1,10 +1,17 @@
 import { Request, Response } from "express";
 import { ScheduleEvent } from "../models/ScheduleEvent";
 
-// 1. Получение событий графика обучения
+// 1. Получение событий
 export const getScheduleEvents = async (req: Request, res: Response): Promise<void> => {
   try {
-    const events = await ScheduleEvent.find()
+    const { isArchived } = req.query;
+    const filter: Record<string, any> = {};
+
+    if (isArchived !== undefined) {
+      filter.isArchived = isArchived === "true";
+    }
+
+    const events = await ScheduleEvent.find(filter)
       .populate("students.client", "name activity city phone manager")
       .populate("students.manager", "name email phone")
       .sort({ createdAt: -1 });
@@ -15,7 +22,7 @@ export const getScheduleEvents = async (req: Request, res: Response): Promise<vo
   }
 };
 
-// 2. Создание события (доступно и менеджеру, и администратору)
+// 2. Создание события
 export const createScheduleEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title, location, startDate, startTime, endDate, endTime, maxStudents } = req.body;
@@ -29,6 +36,7 @@ export const createScheduleEvent = async (req: Request, res: Response): Promise<
       endDate,
       endTime: endTime || "",
       maxStudents: maxStudents ? Number(maxStudents) : 10,
+      isArchived: false,
       manager: authUser?.role === "manager" ? (authUser.id || authUser._id) : undefined,
       students: [],
     });
@@ -63,7 +71,27 @@ export const updateScheduleEvent = async (req: Request, res: Response): Promise<
   }
 };
 
-// 4. Добавление ученика/клиента на курс
+// 4. Переключение архива (архивировать / разархивировать)
+export const toggleArchiveScheduleEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const event = await ScheduleEvent.findById(id);
+
+    if (!event) {
+      res.status(404).json({ message: "Событие не найдено" });
+      return;
+    }
+
+    event.isArchived = !event.isArchived;
+    await event.save();
+
+    res.json(event);
+  } catch (error) {
+    res.status(400).json({ message: "Ошибка при изменении статуса архива", error });
+  }
+};
+
+// 5. Добавление ученика/клиента на курс
 export const addStudentToEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -94,7 +122,7 @@ export const addStudentToEvent = async (req: Request, res: Response): Promise<vo
   }
 };
 
-// 5. Изменение статуса оплаты ученика
+// 6. Изменение статуса оплаты ученика
 export const updateStudentPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, studentId } = req.params;
@@ -126,7 +154,7 @@ export const updateStudentPaymentStatus = async (req: Request, res: Response): P
   }
 };
 
-// 6. Удаление ученика из курса (по значку корзины)
+// 7. Удаление ученика из курса
 export const removeStudentFromEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { eventId, studentId } = req.params;
@@ -154,7 +182,7 @@ export const removeStudentFromEvent = async (req: Request, res: Response): Promi
   }
 };
 
-// 7. Удаление события
+// 8. Удаление события
 export const deleteScheduleEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

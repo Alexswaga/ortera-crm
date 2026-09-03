@@ -1,7 +1,7 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { X, Calendar } from "lucide-react";
-import { scheduleApi } from "../../api/services";
+import { X, Calendar, ChevronDown, Layers } from "lucide-react";
+import { scheduleApi, settingsApi } from "../../api/services";
 
 function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: string }) {
   return (
@@ -45,36 +45,55 @@ export default function ClientAddEvent() {
     maxStudents: 10,
   });
 
+  const [courseTypes, setCourseTypes] = useState<any[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!eventId) return;
-
-    const fetchEventData = async () => {
+    const init = async () => {
       try {
-        setIsLoading(true);
-        const allEvents = await scheduleApi.getAll();
-        const currentEvent = allEvents.find((item: any) => item._id === eventId);
+        const types = await settingsApi.getAll("course_type");
+        setCourseTypes(types || []);
 
-        if (currentEvent) {
-          setFormData({
-            startDate: currentEvent.startDate || "",
-            endDate: currentEvent.endDate || "",
-            location: currentEvent.location || "",
-            title: currentEvent.title || "",
-            maxStudents: currentEvent.maxStudents ? Number(currentEvent.maxStudents) : 10,
-          });
+        if (eventId) {
+          setIsLoading(true);
+          const allEvents = await scheduleApi.getAll();
+          const currentEvent = allEvents.find((item: any) => item._id === eventId);
+
+          if (currentEvent) {
+            setFormData({
+              startDate: currentEvent.startDate || "",
+              endDate: currentEvent.endDate || "",
+              location: currentEvent.location || "",
+              title: currentEvent.title || "",
+              maxStudents: currentEvent.maxStudents ? Number(currentEvent.maxStudents) : 10,
+            });
+          }
         }
       } catch (err) {
-        console.error("Ошибка загрузки события:", err);
+        console.error("Ошибка загрузки данных менеджера:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchEventData();
+    init();
   }, [eventId]);
+
+  const handleSelectCourseType = (typeId: string) => {
+    setSelectedTypeId(typeId);
+    if (!typeId) return;
+
+    const matched = courseTypes.find((t) => t._id === typeId);
+    if (matched) {
+      setFormData((prev) => ({
+        ...prev,
+        title: matched.name,
+        maxStudents: matched.maxStudents ? Number(matched.maxStudents) : 10,
+      }));
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -109,16 +128,49 @@ export default function ClientAddEvent() {
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
-        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[420px] flex flex-col justify-between shadow-xs">
+        <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[460px] flex flex-col justify-between shadow-xs">
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
-              <h1 className="text-[18px] font-bold text-[#576686] mb-8">
-                {isEditing ? "Редактирование события" : "Создание события"}
-              </h1>
+              <div className="flex items-center justify-between mb-8">
+                <h1 className="text-[18px] font-bold text-[#576686]">
+                  {isEditing ? "Редактирование события" : "Создание события"}
+                </h1>
+              </div>
 
               {error && (
                 <div className="mb-6 p-4 rounded-md bg-red-50 border border-red-200 text-sm text-red-600 animate-fadeIn">
                   {error}
+                </div>
+              )}
+
+              {/* Выбор готового типа курса */}
+              {courseTypes.length > 0 && (
+                <div className="mb-6 p-4 rounded-[10px] bg-white border border-[#2ABAEF]/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="size-9 rounded-md bg-[#2ABAEF]/10 flex items-center justify-center text-[#2ABAEF]">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[#576686]">Выбрать из созданных типов курсов</p>
+                      <p className="text-xs text-[#576686]/60">Автоматически подставит название и количество мест</p>
+                    </div>
+                  </div>
+
+                  <div className="relative min-w-[260px]">
+                    <select
+                      value={selectedTypeId}
+                      onChange={(e) => handleSelectCourseType(e.target.value)}
+                      className="w-full h-11 rounded-md border border-[#576686]/20 bg-[#F5F7FA] px-3 pr-8 text-sm text-[#576686] outline-none appearance-none cursor-pointer focus:border-[#2ABAEF]"
+                    >
+                      <option value="">-- Выберите тип курса --</option>
+                      {courseTypes.map((t) => (
+                        <option key={t._id} value={t._id}>
+                          {t.name} ({t.maxStudents || 10} мест)
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#576686]/50" />
+                  </div>
                 </div>
               )}
 

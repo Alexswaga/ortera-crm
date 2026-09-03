@@ -9,9 +9,13 @@ import {
   X,
   Search,
   Check,
-  Trash2
+  Trash2,
+  Archive,
+  FolderArchive,
+  Layers,
+  Settings
 } from "lucide-react";
-import { scheduleApi, clientsApi } from "../api/services";
+import { scheduleApi, clientsApi, settingsApi } from "../api/services";
 
 function CalendarEventIcon({ className = "w-4 h-4 text-white" }: { className?: string }) {
   return (
@@ -86,6 +90,7 @@ const parseEventDate = (dStr?: string | Date): Date | null => {
 export default function Schedule() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [tabFilter, setTabFilter] = useState<"active" | "archived">("active");
   const [courses, setCourses] = useState<any[]>([]);
   const [openCourseIds, setOpenCourseIds] = useState<Record<string, boolean>>({});
   const [currentYear, setCurrentYear] = useState(2026);
@@ -100,10 +105,17 @@ export default function Schedule() {
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isSubmittingStudent, setIsSubmittingStudent] = useState(false);
 
+  // Модалка управления типами курсов (шаблонами)
+  const [isCourseTypesModalOpen, setIsCourseTypesModalOpen] = useState(false);
+  const [courseTypesList, setCourseTypesList] = useState<any[]>([]);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeMax, setNewTypeMax] = useState(10);
+
   const loadSchedule = async () => {
     try {
       setLoading(true);
-      const data = await scheduleApi.getAll();
+      const isArchived = tabFilter === "archived";
+      const data = await scheduleApi.getAll({ isArchived });
       setCourses(data);
       if (data.length > 0) {
         setOpenCourseIds({ [data[0]._id]: true });
@@ -117,13 +129,61 @@ export default function Schedule() {
 
   useEffect(() => {
     loadSchedule();
-  }, []);
+  }, [tabFilter]);
 
   const toggleCourse = (id: string) => {
     setOpenCourseIds((prev) => ({
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const handleToggleArchive = async (courseId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await scheduleApi.toggleArchive(courseId);
+      await loadSchedule();
+    } catch (err) {
+      console.error("Ошибка при архивации курса:", err);
+    }
+  };
+
+  const handleOpenCourseTypes = async () => {
+    setIsCourseTypesModalOpen(true);
+    try {
+      const types = await settingsApi.getAll("course_type");
+      setCourseTypesList(types || []);
+    } catch (err) {
+      console.error("Ошибка загрузки типов курсов:", err);
+    }
+  };
+
+  const handleCreateCourseType = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+
+    try {
+      await settingsApi.create({
+        type: "course_type",
+        name: newTypeName.trim(),
+        maxStudents: Number(newTypeMax) || 10,
+      });
+      setNewTypeName("");
+      setNewTypeMax(10);
+      const updated = await settingsApi.getAll("course_type");
+      setCourseTypesList(updated || []);
+    } catch (err) {
+      console.error("Ошибка создания типа курса:", err);
+    }
+  };
+
+  const handleDeleteCourseType = async (typeId: string) => {
+    try {
+      await settingsApi.delete(typeId);
+      setCourseTypesList((prev) => prev.filter((t) => t._id !== typeId));
+    } catch (err) {
+      console.error("Ошибка удаления типа курса:", err);
+    }
   };
 
   const handleOpenAddStudent = async (courseId: string) => {
@@ -138,7 +198,7 @@ export default function Schedule() {
         setSelectedClientId(clients[0]._id);
       }
     } catch (err) {
-      console.error("Ошибка загрузки списка клиентов:", err);
+      console.error("Ошибка загрузки клиентов:", err);
     }
   };
 
@@ -155,7 +215,7 @@ export default function Schedule() {
       setIsAddStudentOpen(false);
       await loadSchedule();
     } catch (err) {
-      console.error("Ошибка добавления студента на курс:", err);
+      console.error("Ошибка добавления студента:", err);
     } finally {
       setIsSubmittingStudent(false);
     }
@@ -235,7 +295,7 @@ export default function Schedule() {
                     className={`rounded-[10px] px-5 py-4 text-base transition-all duration-200 cursor-pointer ${
                       viewMode === "list"
                         ? "bg-[#576686] text-white shadow-sm font-medium"
-                        : "bg-white text-[#576686] hover:bg-slate-100 hover:text-slate-800 border border-gray-200"
+                        : "bg-white text-[#576686] hover:bg-slate-100 border border-gray-200"
                     }`}
                   >
                     Список
@@ -247,15 +307,42 @@ export default function Schedule() {
                     className={`rounded-[10px] px-5 py-4 text-base transition-all duration-200 cursor-pointer ${
                       viewMode === "calendar"
                         ? "bg-[#576686] text-white shadow-sm font-medium"
-                        : "bg-white text-[#576686] hover:bg-slate-100 hover:text-slate-800 border border-gray-200"
+                        : "bg-white text-[#576686] hover:bg-slate-100 border border-gray-200"
                     }`}
                   >
                     Календарь
                   </button>
                 </div>
 
+                {/* Вкладки: Активные / Архив */}
+                <div className="flex items-center gap-2 bg-white p-1 rounded-[10px] border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setTabFilter("active")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
+                      tabFilter === "active"
+                        ? "bg-[#576686] text-white font-medium shadow-2xs"
+                        : "text-[#576686] hover:bg-slate-100"
+                    }`}
+                  >
+                    Активные
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTabFilter("archived")}
+                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer flex items-center gap-1.5 ${
+                      tabFilter === "archived"
+                        ? "bg-[#576686] text-white font-medium shadow-2xs"
+                        : "text-[#576686] hover:bg-slate-100"
+                    }`}
+                  >
+                    <FolderArchive className="w-4 h-4" />
+                    <span>Архив</span>
+                  </button>
+                </div>
+
                 {viewMode === "calendar" && (
-                  <div className="flex items-center gap-3 ml-4 animate-fadeIn">
+                  <div className="flex items-center gap-3 ml-2 animate-fadeIn">
                     <button
                       type="button"
                       onClick={() => setCurrentYear((prev) => prev - 1)}
@@ -279,24 +366,35 @@ export default function Schedule() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate("/schedule/add")}
-                className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-5 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-normal"
-              >
-                <CalendarEventIcon className="w-4 h-4 text-white" />
-                <span>Добавить событие</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleOpenCourseTypes}
+                  className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-4 py-4 text-base text-[#576686] hover:bg-slate-100 border border-gray-200 transition-all cursor-pointer"
+                  title="Управление типами курсов"
+                >
+                  <Layers className="w-4 h-4 text-[#2ABAEF]" />
+                  <span>Типы курсов</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/schedule/add")}
+                  className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-5 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md transition-all cursor-pointer"
+                >
+                  <CalendarEventIcon className="w-4 h-4 text-white" />
+                  <span>Добавить событие</span>
+                </button>
+              </div>
             </div>
 
             {viewMode === "list" && (
               <div>
-                {/* Шапка таблицы: Город выровнен влево */}
                 <div className="flex items-center px-8 mb-3 text-[12px] text-[#576686]">
-                  <div className="w-[350px]">Дата</div>
+                  <div className="w-[330px]">Дата</div>
                   <div className="flex-1 pl-4">Название курса</div>
-                  <div className="w-[200px] text-left">Город</div>
-                  <div className="w-[160px] text-right"></div>
+                  <div className="w-[180px] text-left">Город</div>
+                  <div className="w-[180px] text-right"></div>
                 </div>
 
                 {loading ? (
@@ -320,7 +418,7 @@ export default function Schedule() {
                           className="rounded-[10px] bg-white border border-gray-100 shadow-xs hover:shadow-md transition-all duration-150 overflow-hidden"
                         >
                           <div className="flex items-center justify-between px-8 h-24 text-[#576686]">
-                            <div className="w-[350px] text-[16px] font-normal">
+                            <div className="w-[330px] text-[16px] font-normal">
                               {displayDate}
                             </div>
 
@@ -329,21 +427,35 @@ export default function Schedule() {
                             </div>
 
                             {/* Крупный город по левому краю */}
-                            <div className="w-[200px] text-[18px] font-bold text-[#576686] text-left truncate">
+                            <div className="w-[180px] text-[18px] font-bold text-[#576686] text-left truncate">
                               {course.location || "Чебоксары"}
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                               <div className="h-7 px-3.5 bg-[#576686] rounded-full flex items-center justify-center gap-2 text-white text-[11px] shadow-xs">
                                 <UserBadgeIcon className="w-3.5 h-3.5 text-white" />
                                 <span className="font-medium">{studentsList.length}/{maxStudents}</span>
                               </div>
 
+                              {/* Кнопка архивации */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleArchive(course._id, e)}
+                                title={course.isArchived ? "Восстановить из архива" : "В архив"}
+                                className={`size-7 flex items-center justify-center rounded-full transition-all cursor-pointer ${
+                                  course.isArchived 
+                                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200" 
+                                    : "bg-[#F5F7FA] text-[#576686] hover:bg-stone-200"
+                                }`}
+                              >
+                                <Archive className="w-4 h-4" />
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => navigate(`/schedule/add?id=${course._id}`)}
                                 aria-label="Редактировать курс"
-                                className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-[#576686] hover:text-white active:scale-95 transition-all duration-150 cursor-pointer text-[#576686]"
+                                className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-[#576686] hover:text-white transition-all cursor-pointer text-[#576686]"
                               >
                                 <EditIcon className="w-4 h-4" />
                               </button>
@@ -352,7 +464,7 @@ export default function Schedule() {
                                 type="button"
                                 onClick={() => toggleCourse(course._id)}
                                 aria-label="Развернуть курс"
-                                className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer text-[#576686]"
+                                className="size-7 flex items-center justify-center rounded-full bg-[#F5F7FA] hover:bg-slate-200 transition-all cursor-pointer text-[#576686]"
                               >
                                 <ChevronDown
                                   className={`w-4 h-4 transition-transform duration-200 ${
@@ -365,7 +477,6 @@ export default function Schedule() {
 
                           {isOpened && (
                             <div className="px-8 pb-8 flex flex-col gap-3 border-t border-gray-50 pt-4 animate-fadeIn">
-                              {/* 1. Занятые места (ученики) */}
                               {studentsList.map((studentItem: any, idx: number) => {
                                 const stClient = studentItem.client || {};
                                 const stManager = studentItem.manager || {};
@@ -396,7 +507,6 @@ export default function Schedule() {
                                       {stPhone}
                                     </div>
 
-                                    {/* Статус оплаты */}
                                     <div className="w-[140px] relative">
                                       <button
                                         type="button"
@@ -404,10 +514,8 @@ export default function Schedule() {
                                           e.stopPropagation();
                                           setOpenStatusMenuKey(openStatusMenuKey === itemKey ? null : itemKey);
                                         }}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs font-normal uppercase transition-colors shadow-2xs cursor-pointer ${
-                                          paymentSt === "paid"
-                                            ? "bg-[#22C55E] hover:bg-green-600"
-                                            : "bg-[#3B82F6] hover:bg-blue-600"
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-xs uppercase transition-colors cursor-pointer ${
+                                          paymentSt === "paid" ? "bg-[#22C55E]" : "bg-[#3B82F6]"
                                         }`}
                                       >
                                         <span>{paymentSt === "paid" ? "Оплачено" : "Аванс"}</span>
@@ -422,7 +530,7 @@ export default function Schedule() {
                                           <button
                                             type="button"
                                             onClick={() => handleStatusChange(course._id, studentItem._id, "paid")}
-                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm text-left cursor-pointer"
                                           >
                                             <span className="text-[#22C55E] font-medium">Оплачено</span>
                                             {paymentSt === "paid" && <Check className="w-3.5 h-3.5 text-[#22C55E]" />}
@@ -430,7 +538,7 @@ export default function Schedule() {
                                           <button
                                             type="button"
                                             onClick={() => handleStatusChange(course._id, studentItem._id, "advance")}
-                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                                            className="flex items-center justify-between px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm text-left cursor-pointer"
                                           >
                                             <span className="text-[#3B82F6] font-medium">Аванс</span>
                                             {paymentSt === "advance" && <Check className="w-3.5 h-3.5 text-[#3B82F6]" />}
@@ -444,25 +552,23 @@ export default function Schedule() {
                                       <span className="truncate">{stManagerName}</span>
                                     </div>
 
-                                    {/* Корзина для удаления студента */}
                                     <div className="flex items-center gap-1">
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveStudent(course._id, studentItem._id)}
                                         title="Удалить студента с курса"
-                                        className="size-8 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 active:scale-90 transition-all cursor-pointer"
+                                        className="size-8 flex items-center justify-center rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all cursor-pointer"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
 
                                       <button
                                         type="button"
-                                        aria-label="Профиль клиента"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (stClient._id) navigate(`/clients/detail?id=${stClient._id}`);
                                         }}
-                                        className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] active:scale-95 transition-all cursor-pointer"
+                                        className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] transition-all cursor-pointer"
                                       >
                                         <MoreVertical className="w-4 h-4" />
                                       </button>
@@ -471,11 +577,10 @@ export default function Schedule() {
                                 );
                               })}
 
-                              {/* 2. Свободные места: Первый слот с кнопкой добавления */}
-                              {freeSlotsCount > 0 && (
+                              {freeSlotsCount > 0 && tabFilter === "active" && (
                                 <div
                                   onClick={() => handleOpenAddStudent(course._id)}
-                                  className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none group"
+                                  className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer group"
                                 >
                                   <div className="size-6 rounded-md bg-[#576686]/10 group-hover:bg-[#2ABAEF]/20 flex items-center justify-center mr-3 transition-colors">
                                     <Plus className="w-4 h-4 text-[#576686] group-hover:text-[#2ABAEF]" />
@@ -484,13 +589,12 @@ export default function Schedule() {
                                 </div>
                               )}
 
-                              {/* 3. Остальные пустые слоты (по макету с черными рамками) */}
-                              {freeSlotsCount > 1 &&
+                              {freeSlotsCount > 1 && tabFilter === "active" &&
                                 Array.from({ length: freeSlotsCount - 1 }).map((_, slotIdx) => (
                                   <div
                                     key={`empty-slot-${slotIdx}`}
                                     onClick={() => handleOpenAddStudent(course._id)}
-                                    className="flex items-center h-14 px-5 rounded-[10px] border border-dashed border-gray-300 bg-white/50 text-gray-400 hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer select-none"
+                                    className="flex items-center h-14 px-5 rounded-[10px] border border-dashed border-gray-300 bg-white/50 text-gray-400 hover:border-[#2ABAEF] hover:text-[#2ABAEF] transition-all cursor-pointer"
                                   >
                                     <span className="text-xs">Свободное место ({studentsList.length + slotIdx + 2}/{maxStudents})</span>
                                   </div>
@@ -503,7 +607,7 @@ export default function Schedule() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-[#576686]/60">
-                    <p className="text-base font-medium">Событий в графике пока нет</p>
+                    <p className="text-base font-medium">Событий в этой категории нет</p>
                   </div>
                 )}
               </div>
@@ -566,6 +670,81 @@ export default function Schedule() {
         </div>
       </div>
 
+      {/* Модалка: Управление типами курсов */}
+      {isCourseTypesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[540px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setIsCourseTypesModalOpen(false)}
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
+            >
+              <X className="size-4" />
+            </button>
+
+            <h2 className="text-[18px] font-bold text-[#576686] mb-6 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-[#2ABAEF]" />
+              <span>Созданные типы курсов</span>
+            </h2>
+
+            <form onSubmit={handleCreateCourseType} className="flex flex-col gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2 flex flex-col gap-1">
+                  <label className="text-xs text-[#576686] font-medium">Название курса</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Например: Курс по ортопедии"
+                    value={newTypeName}
+                    onChange={(e) => setNewTypeName(e.target.value)}
+                    className="w-full h-11 bg-white rounded-md border border-[#576686]/20 px-3 text-sm text-[#576686] outline-none focus:border-[#2ABAEF]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-[#576686] font-medium">Мест</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    required
+                    value={newTypeMax}
+                    onChange={(e) => setNewTypeMax(Number(e.target.value))}
+                    className="w-full h-11 bg-white rounded-md border border-[#576686]/20 px-3 text-sm text-[#576686] outline-none focus:border-[#2ABAEF]"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full h-11 rounded-md bg-[#576686] text-white text-sm font-medium hover:bg-[#475470] transition-colors cursor-pointer"
+              >
+                + Добавить тип курса
+              </button>
+            </form>
+
+            <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
+              {courseTypesList.map((t) => (
+                <div key={t._id} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-200 text-sm text-[#576686]">
+                  <div>
+                    <span className="font-semibold">{t.name}</span>
+                    <span className="text-xs text-[#576686]/60 ml-2">({t.maxStudents || 10} мест)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCourseType(t._id)}
+                    className="text-gray-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {courseTypesList.length === 0 && (
+                <p className="text-xs text-center text-[#576686]/50 py-4">Типы курсов еще не созданы</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Модалка: Запись клиента на курс */}
       {isAddStudentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
@@ -573,7 +752,7 @@ export default function Schedule() {
             <button
               type="button"
               onClick={() => setIsAddStudentOpen(false)}
-              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-xs"
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
             >
               <X className="size-4" />
             </button>
