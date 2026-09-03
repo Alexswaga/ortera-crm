@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
 
@@ -12,15 +13,6 @@ async function run() {
     }
 
     await mongoose.connect(uri);
-
-    // Автоматически подключаем bcrypt или bcryptjs
-    let hasher: any;
-    try {
-      hasher = await import("bcrypt");
-    } catch {
-      hasher = await import("bcryptjs");
-    }
-    const bcrypt = hasher.default || hasher;
 
     const email = "admin@ortera.ru";
     const password = "Ortera!Adm#926_Kx8";
