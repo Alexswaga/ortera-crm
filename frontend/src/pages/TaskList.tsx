@@ -322,6 +322,7 @@ export default function TaskList() {
                         </span>
                       </div>
 
+                      {/* Клиент: ФИО сверху крупно, Город/Деятельность снизу */}
                       <div className="inline-flex items-center gap-3 rounded-[10px] bg-[#F5F7FA] p-2.5 w-fit max-w-[85%]">
                         <div className="flex size-6 shrink-0 items-center justify-center rounded">
                           {clientType === "company" ? (
@@ -331,8 +332,8 @@ export default function TaskList() {
                           )}
                         </div>
                         <div className="truncate">
-                          <div className="text-[12px] text-[#576686]/70 leading-tight truncate">{clientSub}</div>
                           <div className="text-[14px] font-bold text-[#576686] leading-tight truncate">{clientName}</div>
+                          <div className="text-[12px] text-[#576686]/70 leading-tight truncate mt-0.5">{clientSub}</div>
                         </div>
                       </div>
 

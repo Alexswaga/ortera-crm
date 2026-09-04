@@ -37,16 +37,17 @@ export default function AddEvent() {
   const eventId = searchParams.get("id");
   const isEditing = Boolean(eventId);
 
+  const [courseTypes, setCourseTypes] = useState<any[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+
   const [formData, setFormData] = useState({
     startDate: "10.08.2026",
     endDate: "11.08.2026",
     location: "Чебоксары",
-    title: "Курс: Производство каркасных стелек",
+    title: "",
     maxStudents: 10,
   });
 
-  const [courseTypes, setCourseTypes] = useState<any[]>([]);
-  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,19 @@ export default function AddEvent() {
               title: currentEvent.title || "",
               maxStudents: currentEvent.maxStudents ? Number(currentEvent.maxStudents) : 10,
             });
+
+            const matchedType = (types || []).find((t: any) => t.name === currentEvent.title);
+            if (matchedType) {
+              setSelectedTypeId(matchedType._id);
+            }
           }
+        } else if (types && types.length > 0) {
+          setSelectedTypeId(types[0]._id);
+          setFormData((prev) => ({
+            ...prev,
+            title: types[0].name,
+            maxStudents: types[0].maxStudents || 10,
+          }));
         }
       } catch (err) {
         console.error("Ошибка загрузки данных:", err);
@@ -83,8 +96,6 @@ export default function AddEvent() {
 
   const handleSelectCourseType = (typeId: string) => {
     setSelectedTypeId(typeId);
-    if (!typeId) return;
-
     const matched = courseTypes.find((t) => t._id === typeId);
     if (matched) {
       setFormData((prev) => ({
@@ -98,6 +109,12 @@ export default function AddEvent() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.title.trim()) {
+      setError("Пожалуйста, выберите тип курса");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -143,38 +160,38 @@ export default function AddEvent() {
                 </div>
               )}
 
-              {/* Выбор готового типа курса */}
-              {courseTypes.length > 0 && (
-                <div className="mb-6 p-4 rounded-[10px] bg-white border border-[#2ABAEF]/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
-                  <div className="flex items-center gap-3">
-                    <div className="size-9 rounded-md bg-[#2ABAEF]/10 flex items-center justify-center text-[#2ABAEF]">
-                      <Layers className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#576686]">Выбрать из созданных типов курсов</p>
-                      <p className="text-xs text-[#576686]/60">Автоматически подставит название и количество мест</p>
-                    </div>
+              {/* Выбор типа курса */}
+              <div className="mb-8 p-6 rounded-[10px] bg-white border border-[#2ABAEF]/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-md bg-[#2ABAEF]/10 flex items-center justify-center text-[#2ABAEF]">
+                    <Layers className="w-5 h-5" />
                   </div>
-
-                  <div className="relative min-w-[260px]">
-                    <select
-                      value={selectedTypeId}
-                      onChange={(e) => handleSelectCourseType(e.target.value)}
-                      className="w-full h-11 rounded-md border border-[#576686]/20 bg-[#F5F7FA] px-3 pr-8 text-sm text-[#576686] outline-none appearance-none cursor-pointer focus:border-[#2ABAEF]"
-                    >
-                      <option value="">-- Выберите тип курса --</option>
-                      {courseTypes.map((t) => (
-                        <option key={t._id} value={t._id}>
-                          {t.name} ({t.maxStudents || 10} мест)
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#576686]/50" />
+                  <div>
+                    <p className="text-base font-semibold text-[#576686]">Тип обучающего курса</p>
+                    <p className="text-xs text-[#576686]/60">Устанавливает название курса и количество мест</p>
                   </div>
                 </div>
-              )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-[30px] gap-y-6 mb-6">
+                <div className="relative min-w-[320px]">
+                  <select
+                    required
+                    value={selectedTypeId}
+                    onChange={(e) => handleSelectCourseType(e.target.value)}
+                    className="w-full h-12 rounded-md border border-[#576686]/20 bg-[#F5F7FA] px-4 pr-10 text-base text-[#576686] outline-none appearance-none cursor-pointer focus:border-[#2ABAEF]"
+                  >
+                    <option value="">-- Выберите тип курса --</option>
+                    {courseTypes.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.name} ({t.maxStudents || 10} мест)
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#576686]/50" />
+                </div>
+              </div>
+
+              {/* Даты и Место */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-[30px] gap-y-6">
                 <div className="group flex flex-col gap-2">
                   <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                     Даты проведения
@@ -221,38 +238,6 @@ export default function AddEvent() {
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                     placeholder="Город проведения"
-                    className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-[30px] gap-y-6">
-                <div className="group flex flex-col gap-2 lg:col-span-2">
-                  <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Название курса
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Название обучающего курса"
-                    className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                  />
-                </div>
-
-                <div className="group flex flex-col gap-2">
-                  <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                    Количество мест на курсе
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    required
-                    value={formData.maxStudents}
-                    onChange={(e) => setFormData({ ...formData, maxStudents: Number(e.target.value) })}
-                    placeholder="10"
                     className="w-full h-12 rounded-md border border-[#576686]/20 bg-white px-4 text-base text-[#576686] outline-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
                   />
                 </div>
