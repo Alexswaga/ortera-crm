@@ -9,11 +9,13 @@ import {
   X,
   Search,
   Check,
-  User,
   Trash2,
-  Archive,
   FolderArchive,
-  Layers
+  Layers,
+  GraduationCap,
+  Calendar,
+  Building,
+  User as UserIconLucide
 } from "lucide-react";
 import { scheduleApi, clientsApi, settingsApi } from "../../api/services";
 
@@ -37,6 +39,20 @@ function UserBadgeIcon({ className = "w-3.5 h-3.5 text-white" }: { className?: s
       <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.5" />
       <circle cx="8" cy="5.75" r="1.75" fill="currentColor" />
       <path d="M4.2 12.2C4.9 10.3 6.3 9.5 8 9.5C9.7 9.5 11.1 10.3 11.8 12.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ManagerRowIcon({ className = "w-4 h-4 text-[#576686]/60 shrink-0" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M14.0026 8.14667C14.0026 4.48667 11.1626 2 8.0026 2C4.87594 2 2.0026 4.43333 2.0026 8.18667C1.6026 8.41333 1.33594 8.84 1.33594 9.33333V10.6667C1.33594 11.4 1.93594 12 2.66927 12H3.33594V7.93333C3.33594 5.35333 5.4226 3.26667 8.0026 3.26667C10.5826 3.26667 12.6693 5.35333 12.6693 7.93333V12.6667H7.33594V14H12.6693C13.4026 14 14.0026 13.4 14.0026 12.6667V11.8533C14.3959 11.6467 14.6693 11.24 14.6693 10.76V9.22667C14.6693 8.76 14.3959 8.35333 14.0026 8.14667Z"
+        fill="currentColor"
+      />
+      <circle cx="6" cy="9.3" r="0.75" fill="currentColor" />
+      <circle cx="10" cy="9.3" r="0.75" fill="currentColor" />
+      <path d="M4.5 8C5.8 7.3 7 5.8 7.3 4.2C8.2 5.8 9.8 7 11.8 7.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
     </svg>
   );
 }
@@ -76,15 +92,14 @@ const parseEventDate = (dStr?: string | Date): Date | null => {
 export default function ClientSchedule() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
-  const [tabFilter, setTabFilter] = useState<"active" | "archived">("active");
   const [courses, setCourses] = useState<any[]>([]);
   const [openCourseIds, setOpenCourseIds] = useState<Record<string, boolean>>({});
   const [currentYear, setCurrentYear] = useState(2026);
-  const [activeMenuStudentId, setActiveMenuStudentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [openStatusMenuKey, setOpenStatusMenuKey] = useState<string | null>(null);
 
+  // Модалка добавления студента
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [targetCourseId, setTargetCourseId] = useState<string | null>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -92,22 +107,27 @@ export default function ClientSchedule() {
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isSubmittingStudent, setIsSubmittingStudent] = useState(false);
 
+  // Модалка типов курсов
   const [isCourseTypesModalOpen, setIsCourseTypesModalOpen] = useState(false);
   const [courseTypesList, setCourseTypesList] = useState<any[]>([]);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeMax, setNewTypeMax] = useState(10);
 
+  // Модалка архива курсов
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [archivedCourses, setArchivedCourses] = useState<any[]>([]);
+  const [selectedArchivedCourseType, setSelectedArchivedCourseType] = useState<string | null>(null);
+
   const loadSchedule = async () => {
     try {
       setLoading(true);
-      const isArchived = tabFilter === "archived";
-      const data = await scheduleApi.getAll({ isArchived });
+      const data = await scheduleApi.getAll({ isArchived: false });
       setCourses(data);
       if (data.length > 0) {
         setOpenCourseIds({ [data[0]._id]: true });
       }
     } catch (err) {
-      console.error("Ошибка загрузки расписания менеджера:", err);
+      console.error("Ошибка загрузки графика обучения:", err);
     } finally {
       setLoading(false);
     }
@@ -115,7 +135,7 @@ export default function ClientSchedule() {
 
   useEffect(() => {
     loadSchedule();
-  }, [tabFilter]);
+  }, []);
 
   const toggleCourse = (id: string) => {
     setOpenCourseIds((prev) => ({
@@ -124,13 +144,14 @@ export default function ClientSchedule() {
     }));
   };
 
-  const handleToggleArchive = async (courseId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleOpenArchiveModal = async () => {
+    setIsArchiveModalOpen(true);
+    setSelectedArchivedCourseType(null);
     try {
-      await scheduleApi.toggleArchive(courseId);
-      await loadSchedule();
+      const allArchived = await scheduleApi.getAll({ isArchived: true });
+      setArchivedCourses(allArchived || []);
     } catch (err) {
-      console.error("Ошибка при архивации курса:", err);
+      console.error("Ошибка загрузки архива курсов:", err);
     }
   };
 
@@ -238,12 +259,12 @@ export default function ClientSchedule() {
       const start = parseEventDate(course.startDate);
       const end = parseEventDate(course.endDate) || start;
 
-      if (!start || !end) return;
+      if (!start) return;
 
-      const isMultiDay = end.getTime() > start.getTime();
       const cur = new Date(start);
+      const isMultiDay = end && end.getTime() !== start.getTime();
 
-      while (cur.getTime() <= end.getTime()) {
+      while (end && cur <= end) {
         if (cur.getFullYear() === currentYear && cur.getMonth() === monthIndex) {
           const d = cur.getDate();
           const isStart = cur.getTime() === start.getTime();
@@ -251,7 +272,7 @@ export default function ClientSchedule() {
 
           highlightedMap[d] = {
             isSingle: !isMultiDay,
-            isRange: isMultiDay,
+            isRange: !!isMultiDay,
             isStart,
             isEnd,
           };
@@ -266,6 +287,22 @@ export default function ClientSchedule() {
   const filteredModalClients = clientsList.filter((c) =>
     c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
   );
+
+  const uniqueArchivedTypes = Array.from(new Set(archivedCourses.map((c) => c.title)));
+
+  const archivedStudentsOfSelectedType = selectedArchivedCourseType
+    ? archivedCourses
+        .filter((c) => c.title === selectedArchivedCourseType)
+        .flatMap((c) =>
+          (c.students || []).map((s: any) => ({
+            ...s,
+            courseDate: c.startDate === c.endDate || !c.endDate ? c.startDate : `${c.startDate} - ${c.endDate}`,
+            courseLocation: c.location,
+            rawStartDate: parseEventDate(c.startDate) || new Date(0),
+          }))
+        )
+        .sort((a, b) => b.rawStartDate.getTime() - a.rawStartDate.getTime())
+    : [];
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
@@ -300,32 +337,15 @@ export default function ClientSchedule() {
                   </button>
                 </div>
 
-                {/* Вкладки: Активные / Архив */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-[10px] border border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => setTabFilter("active")}
-                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
-                      tabFilter === "active"
-                        ? "bg-[#576686] text-white font-medium shadow-2xs"
-                        : "text-[#576686] hover:bg-slate-100"
-                    }`}
-                  >
-                    Активные
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTabFilter("archived")}
-                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                      tabFilter === "archived"
-                        ? "bg-[#576686] text-white font-medium shadow-2xs"
-                        : "text-[#576686] hover:bg-slate-100"
-                    }`}
-                  >
-                    <FolderArchive className="w-4 h-4" />
-                    <span>Архив</span>
-                  </button>
-                </div>
+                {/* Кнопка «Архив курсов» */}
+                <button
+                  type="button"
+                  onClick={handleOpenArchiveModal}
+                  className="rounded-[10px] px-5 py-4 text-base bg-white text-[#576686] hover:bg-slate-100 border border-gray-200 transition-all cursor-pointer flex items-center gap-2 shadow-xs"
+                >
+                  <FolderArchive className="w-4 h-4 text-[#2ABAEF]" />
+                  <span>Архив курсов</span>
+                </button>
 
                 {viewMode === "calendar" && (
                   <div className="flex items-center gap-3 ml-2 animate-fadeIn">
@@ -412,7 +432,6 @@ export default function ClientSchedule() {
                               {course.title}
                             </div>
 
-                            {/* Крупный город по левому краю */}
                             <div className="w-[180px] text-[18px] font-bold text-[#576686] text-left truncate">
                               {course.location || "Чебоксары"}
                             </div>
@@ -422,20 +441,6 @@ export default function ClientSchedule() {
                                 <UserBadgeIcon className="w-3.5 h-3.5 text-white" />
                                 <span className="font-medium">{studentsList.length}/{maxStudents}</span>
                               </div>
-
-                              {/* Кнопка архивации */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleArchive(course._id, e)}
-                                title={course.isArchived ? "Восстановить из архива" : "В архив"}
-                                className={`size-7 flex items-center justify-center rounded-full transition-all cursor-pointer ${
-                                  course.isArchived 
-                                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200" 
-                                    : "bg-[#F5F7FA] text-[#576686] hover:bg-stone-200"
-                                }`}
-                              >
-                                <Archive className="w-4 h-4" />
-                              </button>
 
                               <button
                                 type="button"
@@ -465,30 +470,31 @@ export default function ClientSchedule() {
                             <div className="px-8 pb-8 flex flex-col gap-3 border-t border-gray-50 pt-4 animate-fadeIn">
                               {studentsList.map((studentItem: any, idx: number) => {
                                 const stClient = studentItem.client || {};
+                                const stManager = studentItem.manager || {};
                                 const stName = stClient.name || "Клиент";
                                 const stRole = stClient.city ? `г. ${stClient.city} / ${stClient.activity || "Подолог"}` : "г. Чебоксары / Подолог";
                                 const stPhone = stClient.phone || "Не указан";
+                                const stManagerName = stManager.name || "Менеджер";
                                 const paymentSt = studentItem.paymentStatus || "advance";
-                                const studentKey = studentItem._id || String(idx);
                                 const itemKey = `${course._id}-${studentItem._id || idx}`;
 
                                 return (
                                   <div
-                                    key={studentKey}
+                                    key={idx}
                                     className="flex items-center justify-between h-14 px-5 rounded-[10px] bg-[#F5F7FA] text-[#576686] text-sm hover:bg-slate-100 transition-colors relative"
                                   >
                                     <div 
                                       onClick={() => stClient._id && navigate(`/client/clients/detail?id=${stClient._id}`)}
-                                      className="w-[320px] text-[16px] font-normal truncate cursor-pointer hover:text-[#2ABAEF]"
+                                      className="w-[300px] text-[16px] font-normal truncate cursor-pointer hover:text-[#2ABAEF]"
                                     >
                                       {stName}
                                     </div>
 
-                                    <div className="w-[200px] text-[12px]">
+                                    <div className="w-[190px] text-[12px]">
                                       {stRole}
                                     </div>
 
-                                    <div className="w-[180px] text-[12px]">
+                                    <div className="w-[170px] text-[12px]">
                                       {stPhone}
                                     </div>
 
@@ -532,6 +538,11 @@ export default function ClientSchedule() {
                                       )}
                                     </div>
 
+                                    <div className="w-[160px] flex items-center gap-2 text-[12px] text-[#576686]">
+                                      <ManagerRowIcon className="w-4 h-4 text-[#576686]/60" />
+                                      <span className="truncate">{stManagerName}</span>
+                                    </div>
+
                                     <div className="flex items-center gap-1">
                                       <button
                                         type="button"
@@ -542,41 +553,22 @@ export default function ClientSchedule() {
                                         <Trash2 className="w-4 h-4" />
                                       </button>
 
-                                      <div className="relative">
-                                        <button
-                                          type="button"
-                                          onClick={() => setActiveMenuStudentId(activeMenuStudentId === studentKey ? null : studentKey)}
-                                          aria-label="Опции"
-                                          className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] transition-all cursor-pointer"
-                                        >
-                                          <MoreVertical className="w-4 h-4" />
-                                        </button>
-
-                                        {activeMenuStudentId === studentKey && (
-                                          <div 
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="absolute right-0 top-8 z-30 w-40 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn"
-                                          >
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setActiveMenuStudentId(null);
-                                                navigate(`/client/clients/detail?id=${stClient._id || ""}`);
-                                              }}
-                                              className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm text-left cursor-pointer"
-                                            >
-                                              <UserBadgeIcon className="w-3.5 h-3.5 text-[#576686]" />
-                                              <span>Профиль</span>
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (stClient._id) navigate(`/client/clients/detail?id=${stClient._id}`)}
+                                        }
+                                        className="size-7 flex items-center justify-center rounded-full hover:bg-slate-200 text-[#576686] transition-all cursor-pointer"
+                                      >
+                                        <MoreVertical className="w-4 h-4" />
+                                      </button>
                                     </div>
                                   </div>
                                 );
                               })}
 
-                              {freeSlotsCount > 0 && tabFilter === "active" && (
+                              {freeSlotsCount > 0 && (
                                 <div
                                   onClick={() => handleOpenAddStudent(course._id)}
                                   className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer group"
@@ -588,7 +580,7 @@ export default function ClientSchedule() {
                                 </div>
                               )}
 
-                              {freeSlotsCount > 1 && tabFilter === "active" &&
+                              {freeSlotsCount > 1 &&
                                 Array.from({ length: freeSlotsCount - 1 }).map((_, slotIdx) => (
                                   <div
                                     key={`empty-slot-${slotIdx}`}
@@ -606,7 +598,7 @@ export default function ClientSchedule() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-[#576686]/60">
-                    <p className="text-base font-medium">Событий в этой категории нет</p>
+                    <p className="text-base font-medium">Нет активных событий</p>
                   </div>
                 )}
               </div>
@@ -650,11 +642,7 @@ export default function ClientSchedule() {
                                   ? "bg-[#2ABAEF] text-white rounded-full font-bold shadow-xs hover:bg-[#209ecf]"
                                   : highlight?.isRange
                                   ? `bg-[#2ABAEF] text-white font-bold hover:bg-[#209ecf] ${
-                                      highlight.isStart
-                                        ? "rounded-l-full"
-                                        : highlight.isEnd
-                                        ? "rounded-r-full"
-                                        : "rounded-none"
+                                      highlight.isStart ? "rounded-l-full" : highlight.isEnd ? "rounded-r-full" : "rounded-none"
                                     }`
                                   : "bg-white text-[#576686] rounded-sm hover:bg-slate-100"
                               }`}
@@ -672,6 +660,123 @@ export default function ClientSchedule() {
           </div>
         </div>
       </div>
+
+      {/* Модалка: Архив курсов и список участников */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[850px] max-h-[85vh] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200 flex flex-col">
+            <button
+              type="button"
+              onClick={() => setIsArchiveModalOpen(false)}
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <FolderArchive className="w-6 h-6 text-[#2ABAEF]" />
+              <h2 className="text-[20px] font-bold text-[#576686]">
+                {selectedArchivedCourseType ? selectedArchivedCourseType : "Архив обучающих курсов"}
+              </h2>
+            </div>
+
+            {!selectedArchivedCourseType ? (
+              <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3">
+                {uniqueArchivedTypes.length > 0 ? (
+                  uniqueArchivedTypes.map((courseTitle) => {
+                    const totalStudents = archivedCourses
+                      .filter((c) => c.title === courseTitle)
+                      .reduce((acc, c) => acc + (c.students?.length || 0), 0);
+
+                    return (
+                      <div
+                        key={courseTitle}
+                        onClick={() => setSelectedArchivedCourseType(courseTitle)}
+                        className="flex items-center justify-between p-5 bg-white rounded-[10px] border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2ABAEF]/40 hover:-translate-y-0.5 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="size-9 rounded-md bg-[#2ABAEF]/10 text-[#2ABAEF] flex items-center justify-center">
+                            <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <span className="text-[16px] font-bold text-[#576686] group-hover:text-[#2ABAEF] transition-colors">
+                            {courseTitle}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-[#576686]/60 bg-[#F5F7FA] px-3 py-1.5 rounded-full">
+                            Прошли обучение: <b>{totalStudents}</b> чел.
+                          </span>
+                          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#2ABAEF] group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-48 text-[#576686]/60">
+                    <p className="text-sm">Архив пока пуст. Завершенные курсы переместятся сюда автоматически.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchivedCourseType(null)}
+                  className="self-start text-xs font-semibold text-[#2ABAEF] hover:underline mb-2 flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Вернуться к списку курсов архива</span>
+                </button>
+
+                {archivedStudentsOfSelectedType.length > 0 ? (
+                  archivedStudentsOfSelectedType.map((item: any, idx: number) => {
+                    const client = item.client || {};
+                    const isCompany = client.type === "company";
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => client._id && navigate(`/client/clients/detail?id=${client._id}`)}
+                        className="flex items-center justify-between p-4 bg-white rounded-[10px] border border-gray-100 shadow-xs hover:border-[#2ABAEF]/40 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-center gap-3 min-w-[260px]">
+                          <div className="size-8 rounded-full bg-[#F5F7FA] flex items-center justify-center text-[#576686] shrink-0">
+                            {isCompany ? <Building className="w-4 h-4" /> : <UserIconLucide className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[#576686] hover:text-[#2ABAEF] transition-colors">{client.name || "Клиент"}</p>
+                            <p className="text-xs text-[#576686]/60">{client.city || "Город не указан"} {client.activity ? `/ ${client.activity}` : ""}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-[#576686] min-w-[180px]">
+                          <Calendar className="w-3.5 h-3.5 text-[#2ABAEF]" />
+                          <span>{item.courseDate}</span>
+                        </div>
+
+                        <div className="text-xs text-[#576686]/80 min-w-[120px]">
+                          {item.courseLocation || "Чебоксары"}
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-medium uppercase text-white ${
+                            item.paymentStatus === "paid" ? "bg-[#22C55E]" : "bg-[#3B82F6]"
+                          }`}>
+                            {item.paymentStatus === "paid" ? "Оплачено" : "Аванс"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-center text-[#576686]/50 py-8">На этом курсе пока не было зарегистрированных участников</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Модалка: Управление типами курсов */}
       {isCourseTypesModalOpen && (

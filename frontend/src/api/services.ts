@@ -47,6 +47,14 @@ export const clientsApi = {
     const { data } = await api.post(`/clients/${clientId}/notes`, { text });
     return data;
   },
+  transfer: async (clientId: string, newManagerId: string) => {
+    const { data } = await api.post(`/clients/${clientId}/transfer`, { newManagerId });
+    return data;
+  },
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/clients/${id}`);
+    return data;
+  },
 };
 
 export const tasksApi = {

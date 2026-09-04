@@ -13,9 +13,11 @@ import {
   Heart,
   User,
   Trash2,
-  Search
+  Search,
+  GraduationCap,
+  UserCheck
 } from "lucide-react";
-import { clientsApi, tasksApi, settingsApi } from "../../api/services";
+import { clientsApi, tasksApi, settingsApi, scheduleApi, managersApi } from "../../api/services";
 
 function BackArrowIcon() {
   return (
@@ -139,16 +141,24 @@ export default function ClientClientDetail() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [allClients, setAllClients] = useState<any[]>([]);
+  const [completedCourses, setCompletedCourses] = useState<any[]>([]);
   const [, setLoading] = useState(true);
 
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedTask, setSelectedTask] = useState<any>(null);
 
+  // Модальные окна
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
   const [isPostponeTaskOpen, setIsPostponeTaskOpen] = useState(false);
   const [isCompleteTaskOpen, setIsCompleteTaskOpen] = useState(false);
   const [isAddTagOpen, setIsAddTagOpen] = useState(false);
+
+  // Модалка передачи клиента
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [managersList, setManagersList] = useState<any[]>([]);
+  const [selectedNewManagerId, setSelectedNewManagerId] = useState("");
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const [noteText, setNoteText] = useState("");
   const [postponeDate, setPostponeDate] = useState("14:28  /  16.07.2026");
@@ -157,7 +167,7 @@ export default function ClientClientDetail() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   const [tags, setTags] = useState<string[]>([]);
-  const [activeFilter, setActiveFilter] = useState<"all" | "tasks" | "notes">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "tasks" | "notes" | "courses">("all");
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
@@ -165,11 +175,16 @@ export default function ClientClientDetail() {
   const loadClientData = async () => {
     try {
       setLoading(true);
-      const [clientsList, settingsData] = await Promise.all([
+      const [clientsList, settingsData, allEvents, managers] = await Promise.all([
         clientsApi.getAll(),
         settingsApi.getAll("tag").catch(() => []),
+        scheduleApi.getAll().catch(() => []),
+        managersApi.getAll().catch(() => []),
       ]);
+
       setAllClients(clientsList);
+      setManagersList(managers.filter((m: any) => m.isActive !== false));
+
       if (settingsData && settingsData.length > 0) {
         setAvailableTags(settingsData.map((item: any) => item.name));
       }
@@ -188,6 +203,20 @@ export default function ClientClientDetail() {
         if (details.client?.employees?.length > 0) {
           setSelectedEmployee(details.client.employees[0].name);
         }
+
+        const passed = allEvents
+          .filter((ev: any) =>
+            ev.isArchived &&
+            (ev.students || []).some((s: any) => (s.client?._id || s.client) === targetId)
+          )
+          .map((ev: any) => ({
+            _id: ev._id,
+            title: ev.title,
+            dates: ev.startDate === ev.endDate || !ev.endDate ? ev.startDate : `${ev.startDate} - ${ev.endDate}`,
+            location: ev.location,
+          }));
+
+        setCompletedCourses(passed);
       }
     } catch (err) {
       console.error("Ошибка загрузки данных клиента:", err);
@@ -289,6 +318,31 @@ export default function ClientClientDetail() {
     }
   };
 
+  // Передача клиента другому менеджеру
+  const handleOpenTransferModal = () => {
+    const currentMgrId = client?.manager?._id || client?.manager;
+    const firstOtherMgr = managersList.find((m) => m._id !== currentMgrId);
+    setSelectedNewManagerId(firstOtherMgr ? firstOtherMgr._id : "");
+    setIsTransferModalOpen(true);
+  };
+
+  const handleTransferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!client?._id || !selectedNewManagerId) return;
+
+    try {
+      setIsTransferring(true);
+      await clientsApi.transfer(client._id, selectedNewManagerId);
+      setIsTransferModalOpen(false);
+      // У текущего менеджера клиент исчезает, возвращаем на страницу клиентов
+      navigate("/client/clients");
+    } catch (err) {
+      console.error("Ошибка при передаче клиента:", err);
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const filteredTasks = tasks.filter((t) => {
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
@@ -313,6 +367,7 @@ export default function ClientClientDetail() {
   const clientSub = client?.city ? `г. ${client.city} / ${client.activity || ""}` : client?.activity || "Клиент";
   const clientEmail = client?.email || "Не указан";
   const clientPhone = client?.phone || "Не указан";
+  const currentManagerName = client?.manager?.name || "Текущий менеджер";
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] relative selection:bg-[#2ABAEF]/20">
@@ -320,7 +375,6 @@ export default function ClientClientDetail() {
         
         {/* Шапка клиента */}
         <div className="relative w-full min-h-[82px] bg-[#576686] rounded-[10px] px-6 py-4 flex flex-wrap items-center justify-between gap-4 z-10 shadow-xs">
-          
           <div className="flex items-center gap-4">
             <div onClick={() => navigate("/client/clients")}>
               <BackArrowIcon />
@@ -381,20 +435,16 @@ export default function ClientClientDetail() {
               <ChevronDown className="w-3.5 h-3.5 opacity-90" />
             </button>
 
-            {/* Редактирование клиента */}
             <div onClick={() => navigate(`/client/clients/add?id=${client?._id || clientIdParam || ""}`)}>
               <EditHeaderCircleIcon />
             </div>
           </div>
-
         </div>
 
         {/* Контент */}
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[838px] mt-[30px] flex flex-col justify-between shadow-xs">
-          
           <div>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-              
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -429,8 +479,24 @@ export default function ClientClientDetail() {
                 >
                   Заметки
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFilter("courses")}
+                  className={`rounded-[10px] px-5 py-4 text-base transition-all duration-200 cursor-pointer flex items-center gap-2 ${
+                    activeFilter === "courses"
+                      ? "bg-[#576686] text-white shadow-sm font-medium"
+                      : "bg-white/50 text-[#576686] hover:bg-white hover:shadow-xs"
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  <span>Пройденные курсы</span>
+                  {completedCourses.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full text-xs bg-[#2ABAEF] text-white font-bold">
+                      {completedCourses.length}
+                    </span>
+                  )}
+                </button>
 
-                {/* Интерактивный фильтр дат */}
                 <div className="flex items-center gap-2 text-xs text-[#576686] ml-4 bg-white px-3.5 py-2.5 rounded-md border border-gray-200 shadow-xs">
                   <span>Интервал дат:</span>
                   <div className="flex items-center gap-1.5">
@@ -456,9 +522,9 @@ export default function ClientClientDetail() {
                 </div>
               </div>
 
-              {/* Поиск и действия */}
-              <div className="flex items-center gap-4">
-                <div className="relative w-80 h-12 group">
+              {/* Поиск и действия: Передать клиента (левее) + Добавить заметку + Создать задачу */}
+              <div className="flex items-center gap-3">
+                <div className="relative w-64 h-12 group">
                   <input
                     type="search"
                     placeholder="Искать на странице"
@@ -468,6 +534,16 @@ export default function ClientClientDetail() {
                   />
                   <Search className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-[#2ABAEF]" />
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenTransferModal}
+                  className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-5 py-4 text-base text-[#576686] hover:bg-sky-50 hover:border-[#2ABAEF]/50 hover:text-[#2ABAEF] border border-gray-200 active:scale-[0.98] transition-all duration-150 cursor-pointer font-medium shadow-xs"
+                  title="Передать клиента другому менеджеру"
+                >
+                  <UserCheck className="w-4 h-4 text-[#2ABAEF]" />
+                  <span>Передать клиента</span>
+                </button>
 
                 <button
                   type="button"
@@ -487,10 +563,9 @@ export default function ClientClientDetail() {
                   <span>Создать задачу</span>
                 </button>
               </div>
-
             </div>
 
-            {/* Теги клиента с рабочей кнопкой добавления */}
+            {/* Теги клиента */}
             <div className="flex flex-wrap items-center gap-2.5 mb-8">
               {tags.map((tag) => (
                 <div
@@ -518,153 +593,252 @@ export default function ClientClientDetail() {
               </button>
             </div>
 
-            {/* Таймлайн */}
-            <div className="relative pl-24">
-              <div className="absolute left-[78px] top-4 bottom-4 w-px bg-[#576686]" />
-
-              {/* Задачи клиента */}
-              {(activeFilter === "all" || activeFilter === "tasks") && filteredTasks.map((task) => (
-                <div key={task._id} className="relative mb-10">
-                  <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
-                    <div className="font-bold">{formatTime(task.startDate)}</div>
-                    <div className="text-[11px] opacity-80">{formatDate(task.startDate)}</div>
-                  </div>
-
-                  <div className="absolute -left-[38px] top-0 size-11 bg-emerald-400 rounded-full flex items-center justify-center text-white shadow-sm z-10">
-                    <Phone className="w-5 h-5" />
-                  </div>
-
-                  <div className="bg-white rounded-[10px] p-6 border border-gray-100 shadow-xs hover:shadow-md transition-all duration-150 ml-6 relative">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="px-4 py-1.5 bg-stone-400 text-white rounded-full text-xs">
-                          {task.status === "completed" ? "Выполнено" : "в работе"}
-                        </span>
-                        <span className="text-xs text-[#576686]">
-                          {formatTime(task.startDate)} / {formatDate(task.startDate)}
-                        </span>
-                        <span className="text-xs text-stone-400">
-                          {task.endDate ? `до ${formatTime(task.endDate)} / ${formatDate(task.endDate)}` : ""}
-                        </span>
+            {/* Контент таба «Пройденные курсы» */}
+            {activeFilter === "courses" && (
+              <div className="flex flex-col gap-4 animate-fadeIn">
+                {completedCourses.length > 0 ? (
+                  completedCourses.map((c) => (
+                    <div
+                      key={c._id}
+                      className="p-6 bg-white rounded-[10px] border border-gray-100 shadow-xs flex items-center justify-between hover:border-[#2ABAEF]/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="size-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <GraduationCap className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-[17px] font-bold text-[#576686]">{c.title}</h4>
+                          <p className="text-xs text-[#576686]/60 mt-0.5">Город: {c.location || "Чебоксары"}</p>
+                        </div>
                       </div>
 
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setActiveMenuTaskId(activeMenuTaskId === task._id ? null : task._id)}
-                          className="size-8 rounded-full bg-gray-50 flex items-center justify-center text-[#576686] hover:bg-gray-200 transition-colors cursor-pointer"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {activeMenuTaskId === task._id && (
-                          <div className="absolute right-0 top-9 z-30 w-44 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuTaskId(null);
-                                setSelectedTask(task);
-                                setIsCompleteTaskOpen(true);
-                              }}
-                              className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
-                            >
-                              <Check className="w-3.5 h-3.5 text-emerald-500" />
-                              <span>Завершить</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuTaskId(null);
-                                setSelectedTask(task);
-                                setIsPostponeTaskOpen(true);
-                              }}
-                              className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
-                            >
-                              <Clock className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Отложить</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveMenuTaskId(null);
-                                handleDeleteTask(task._id);
-                              }}
-                              className="flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-sm transition-colors text-left cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Удалить</span>
-                            </button>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-2 bg-[#F5F7FA] px-4 py-2 rounded-md text-xs font-medium text-[#576686]">
+                        <Calendar className="w-4 h-4 text-[#2ABAEF]" />
+                        <span>Дата прохождения: <b>{c.dates}</b></span>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-[#576686]/60 bg-white rounded-[10px] border border-gray-100">
+                    <GraduationCap className="w-8 h-8 text-gray-300 mb-2" />
+                    <p className="text-base font-medium">Клиент пока не завершил ни одного обучающего курса</p>
+                  </div>
+                )}
+              </div>
+            )}
 
-                    <h3 className="text-[18px] font-bold text-[#576686] mb-3">
-                      {task.title}
-                    </h3>
+            {/* Таймлайн с задачами и заметками */}
+            {activeFilter !== "courses" && (
+              <div className="relative pl-24">
+                <div className="absolute left-[78px] top-4 bottom-4 w-px bg-[#576686]" />
 
-                    {task.description && (
-                      <p className="text-base text-[#576686] leading-relaxed mb-6">
-                        {task.description}
-                      </p>
-                    )}
+                {/* Задачи клиента */}
+                {(activeFilter === "all" || activeFilter === "tasks") && filteredTasks.map((task) => (
+                  <div key={task._id} className="relative mb-10">
+                    <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
+                      <div className="font-bold">{formatTime(task.startDate)}</div>
+                      <div className="text-[11px] opacity-80">{formatDate(task.startDate)}</div>
+                    </div>
 
-                    {task.status !== "completed" && (
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTask(task);
-                            setIsPostponeTaskOpen(true);
-                          }}
-                          className="flex items-center gap-2 px-5 py-3 rounded-[10px] bg-[#F5F7FA] text-[#576686] text-sm hover:bg-slate-200 active:scale-[0.98] transition-all cursor-pointer"
-                        >
-                          <Clock className="w-4 h-4" />
-                          <span>Отложить задачу</span>
-                        </button>
+                    <div className="absolute -left-[38px] top-0 size-11 bg-emerald-400 rounded-full flex items-center justify-center text-white shadow-sm z-10">
+                      <Phone className="w-5 h-5" />
+                    </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTask(task);
-                            setIsCompleteTaskOpen(true);
-                          }}
-                          className="flex items-center gap-2 px-5 py-3 rounded-[10px] bg-[#576686] text-white text-sm hover:bg-[#475470] hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>Завершить задачу</span>
-                        </button>
+                    <div className="bg-white rounded-[10px] p-6 border border-gray-100 shadow-xs hover:shadow-md transition-all duration-150 ml-6 relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="px-4 py-1.5 bg-stone-400 text-white rounded-full text-xs">
+                            {task.status === "completed" ? "Выполнено" : "в работе"}
+                          </span>
+                          <span className="text-xs text-[#576686]">
+                            {formatTime(task.startDate)} / {formatDate(task.startDate)}
+                          </span>
+                          <span className="text-xs text-stone-400">
+                            {task.endDate ? `до ${formatTime(task.endDate)} / ${formatDate(task.endDate)}` : ""}
+                          </span>
+                        </div>
+
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setActiveMenuTaskId(activeMenuTaskId === task._id ? null : task._id)}
+                            className="size-8 rounded-full bg-gray-50 flex items-center justify-center text-[#576686] hover:bg-gray-200 transition-colors cursor-pointer"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {activeMenuTaskId === task._id && (
+                            <div className="absolute right-0 top-9 z-30 w-44 rounded-md bg-white p-1.5 shadow-xl border border-gray-100 flex flex-col gap-1 animate-fadeIn">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuTaskId(null);
+                                  setSelectedTask(task);
+                                  setIsCompleteTaskOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Завершить</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuTaskId(null);
+                                  setSelectedTask(task);
+                                  setIsPostponeTaskOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-xs text-[#576686] hover:bg-[#F5F7FA] rounded-sm transition-colors text-left cursor-pointer"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Отложить</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuTaskId(null);
+                                  handleDeleteTask(task._id);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-sm transition-colors text-left cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Удалить</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
+
+                      <h3 className="text-[18px] font-bold text-[#576686] mb-3">
+                        {task.title}
+                      </h3>
+
+                      {task.description && (
+                        <p className="text-base text-[#576686] leading-relaxed mb-6">
+                          {task.description}
+                        </p>
+                      )}
+
+                      {task.status !== "completed" && (
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setIsPostponeTaskOpen(true);
+                            }}
+                            className="flex items-center gap-2 px-5 py-3 rounded-[10px] bg-[#F5F7FA] text-[#576686] text-sm hover:bg-slate-200 active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <Clock className="w-4 h-4" />
+                            <span>Отложить задачу</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTask(task);
+                              setIsCompleteTaskOpen(true);
+                            }}
+                            className="flex items-center gap-2 px-5 py-3 rounded-[10px] bg-[#576686] text-white text-sm hover:bg-[#475470] hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Завершить задачу</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {/* Заметки клиента */}
-              {(activeFilter === "all" || activeFilter === "notes") && filteredNotes.map((note) => (
-                <div key={note._id} className="relative mb-10">
-                  <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
-                    <div className="font-bold">{formatTime(note.createdAt)}</div>
-                    <div className="text-[11px] opacity-80">{formatDate(note.createdAt)}</div>
+                {/* Заметки клиента */}
+                {(activeFilter === "all" || activeFilter === "notes") && filteredNotes.map((note) => (
+                  <div key={note._id} className="relative mb-10">
+                    <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
+                      <div className="font-bold">{formatTime(note.createdAt)}</div>
+                      <div className="text-[11px] opacity-80">{formatDate(note.createdAt)}</div>
+                    </div>
+
+                    <div className="absolute -left-[38px] top-0 size-11 bg-[#576686] rounded-full flex items-center justify-center text-white shadow-sm z-10">
+                      <NoteAddIcon className="w-5 h-5 text-white" />
+                    </div>
+
+                    <div className="bg-[#F5F7FA] rounded-[10px] p-7 border border-[#576686]/20 ml-6 text-base text-[#576686] leading-relaxed shadow-xs hover:border-[#576686]/50 transition-colors">
+                      {note.text}
+                    </div>
                   </div>
-
-                  <div className="absolute -left-[38px] top-0 size-11 bg-[#576686] rounded-full flex items-center justify-center text-white shadow-sm z-10">
-                    <NoteAddIcon className="w-5 h-5 text-white" />
-                  </div>
-
-                  <div className="bg-[#F5F7FA] rounded-[10px] p-7 border border-[#576686]/20 ml-6 text-base text-[#576686] leading-relaxed shadow-xs hover:border-[#576686]/50 transition-colors">
-                    {note.text}
-                  </div>
-                </div>
-              ))}
-
-            </div>
-
+                ))}
+              </div>
+            )}
           </div>
-
         </div>
-
       </div>
+
+      {/* Модалка: Передать клиента другому менеджеру */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setIsTransferModalOpen(false)}
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
+            >
+              <X className="size-4" />
+            </button>
+
+            <h2 className="text-[18px] font-bold text-[#576686] mb-2 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-[#2ABAEF]" />
+              <span>Передать клиента</span>
+            </h2>
+            <p className="text-xs text-[#576686]/70 mb-6">
+              Клиент <b>{clientName}</b> будет передан выбранному менеджеру и удалится из вашего кабинета.
+            </p>
+
+            <form onSubmit={handleTransferSubmit} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-[#576686] font-medium">Выберите нового менеджера</label>
+                <div className="relative w-full">
+                  <select
+                    required
+                    value={selectedNewManagerId}
+                    onChange={(e) => setSelectedNewManagerId(e.target.value)}
+                    className="w-full h-12 bg-white rounded-md border border-[#576686]/20 px-4 pr-10 text-base text-[#576686] outline-none appearance-none cursor-pointer focus:border-[#2ABAEF]"
+                  >
+                    <option value="">-- Выберите менеджера --</option>
+                    {managersList.map((m) => {
+                      const isCurrent = m._id === (client?.manager?._id || client?.manager);
+                      return (
+                        <option key={m._id} value={m._id} disabled={isCurrent}>
+                          {m.name} {isCurrent ? `(Вы / ${currentManagerName})` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#576686]/50" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsTransferModalOpen(false)}
+                  className="px-5 h-11 rounded-[10px] bg-white text-[#576686] text-sm border border-gray-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Отмена
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isTransferring || !selectedNewManagerId}
+                  className="px-6 h-11 rounded-[10px] bg-[#576686] text-white text-sm font-medium hover:bg-[#475470] transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>{isTransferring ? "Передача..." : "Передать"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Модалка: Добавление нового тега */}
       {isAddTagOpen && (
@@ -949,7 +1123,6 @@ export default function ClientClientDetail() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

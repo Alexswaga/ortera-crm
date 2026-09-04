@@ -192,7 +192,43 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// 7. Удаление клиента
+// 7. Передача клиента новому менеджеру
+export const transferClient = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const { newManagerId } = req.body;
+
+    if (!newManagerId) {
+      res.status(400).json({ message: "Не указан ID нового менеджера" });
+      return;
+    }
+
+    const updatedClient = await Client.findByIdAndUpdate(
+      id,
+      { $set: { manager: newManagerId } },
+      { new: true }
+    ).populate("manager", "name email phone");
+
+    if (!updatedClient) {
+      res.status(404).json({ message: "Клиент не найден" });
+      return;
+    }
+
+    await Task.updateMany(
+      { client: id as any, status: { $in: ["in_work", "overdue"] } },
+      { $set: { manager: newManagerId } }
+    );
+
+    res.json({
+      message: "Клиент успешно передан новому менеджеру",
+      client: updatedClient,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Ошибка при передаче клиента", error });
+  }
+};
+
+// 8. Удаление клиента
 export const deleteClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);

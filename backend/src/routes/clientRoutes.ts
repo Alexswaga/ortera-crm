@@ -6,6 +6,8 @@ import {
   updateClient,
   toggleClientActive,
   addClientNote,
+  transferClient,
+  deleteClient,
 } from "../controllers/clientController";
 import { requireAuth } from "../middlewares/auth";
 
@@ -19,5 +21,7 @@ router.post("/", createClient);
 router.put("/:id", updateClient);
 router.patch("/:id/toggle-active", toggleClientActive);
 router.post("/:id/notes", addClientNote);
+router.post("/:id/transfer", transferClient);
+router.delete("/:id", deleteClient);
 
 export default router;

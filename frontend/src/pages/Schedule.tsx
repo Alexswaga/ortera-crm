@@ -10,10 +10,12 @@ import {
   Search,
   Check,
   Trash2,
-  Archive,
   FolderArchive,
   Layers,
-  Settings
+  GraduationCap,
+  Calendar,
+  Building,
+  User as UserIconLucide
 } from "lucide-react";
 import { scheduleApi, clientsApi, settingsApi } from "../api/services";
 
@@ -90,7 +92,6 @@ const parseEventDate = (dStr?: string | Date): Date | null => {
 export default function Schedule() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
-  const [tabFilter, setTabFilter] = useState<"active" | "archived">("active");
   const [courses, setCourses] = useState<any[]>([]);
   const [openCourseIds, setOpenCourseIds] = useState<Record<string, boolean>>({});
   const [currentYear, setCurrentYear] = useState(2026);
@@ -98,6 +99,7 @@ export default function Schedule() {
 
   const [openStatusMenuKey, setOpenStatusMenuKey] = useState<string | null>(null);
 
+  // Модалка добавления студента на курс
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
   const [targetCourseId, setTargetCourseId] = useState<string | null>(null);
   const [clientsList, setClientsList] = useState<any[]>([]);
@@ -105,17 +107,22 @@ export default function Schedule() {
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isSubmittingStudent, setIsSubmittingStudent] = useState(false);
 
-  // Модалка управления типами курсов (шаблонами)
+  // Модалка типов курсов
   const [isCourseTypesModalOpen, setIsCourseTypesModalOpen] = useState(false);
   const [courseTypesList, setCourseTypesList] = useState<any[]>([]);
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeMax, setNewTypeMax] = useState(10);
 
+  // Модалка архива курсов
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [archivedCourses, setArchivedCourses] = useState<any[]>([]);
+  const [selectedArchivedCourseType, setSelectedArchivedCourseType] = useState<string | null>(null);
+
   const loadSchedule = async () => {
     try {
       setLoading(true);
-      const isArchived = tabFilter === "archived";
-      const data = await scheduleApi.getAll({ isArchived });
+      // Всегда загружаем активные курсы
+      const data = await scheduleApi.getAll({ isArchived: false });
       setCourses(data);
       if (data.length > 0) {
         setOpenCourseIds({ [data[0]._id]: true });
@@ -129,7 +136,7 @@ export default function Schedule() {
 
   useEffect(() => {
     loadSchedule();
-  }, [tabFilter]);
+  }, []);
 
   const toggleCourse = (id: string) => {
     setOpenCourseIds((prev) => ({
@@ -138,13 +145,14 @@ export default function Schedule() {
     }));
   };
 
-  const handleToggleArchive = async (courseId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleOpenArchiveModal = async () => {
+    setIsArchiveModalOpen(true);
+    setSelectedArchivedCourseType(null);
     try {
-      await scheduleApi.toggleArchive(courseId);
-      await loadSchedule();
+      const allArchived = await scheduleApi.getAll({ isArchived: true });
+      setArchivedCourses(allArchived || []);
     } catch (err) {
-      console.error("Ошибка при архивации курса:", err);
+      console.error("Ошибка загрузки архива курсов:", err);
     }
   };
 
@@ -281,6 +289,24 @@ export default function Schedule() {
     c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
   );
 
+  // Группировка завершившихся курсов по их уникальным названиям
+  const uniqueArchivedTypes = Array.from(new Set(archivedCourses.map((c) => c.title)));
+
+  // Участники выбранного в архиве курса с сортировкой от свежих к давним
+  const archivedStudentsOfSelectedType = selectedArchivedCourseType
+    ? archivedCourses
+        .filter((c) => c.title === selectedArchivedCourseType)
+        .flatMap((c) =>
+          (c.students || []).map((s: any) => ({
+            ...s,
+            courseDate: c.startDate === c.endDate || !c.endDate ? c.startDate : `${c.startDate} - ${c.endDate}`,
+            courseLocation: c.location,
+            rawStartDate: parseEventDate(c.startDate) || new Date(0),
+          }))
+        )
+        .sort((a, b) => b.rawStartDate.getTime() - a.rawStartDate.getTime())
+    : [];
+
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
       <div className="mx-auto w-full max-w-[1500px]">
@@ -314,32 +340,15 @@ export default function Schedule() {
                   </button>
                 </div>
 
-                {/* Вкладки: Активные / Архив */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-[10px] border border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => setTabFilter("active")}
-                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer ${
-                      tabFilter === "active"
-                        ? "bg-[#576686] text-white font-medium shadow-2xs"
-                        : "text-[#576686] hover:bg-slate-100"
-                    }`}
-                  >
-                    Активные
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTabFilter("archived")}
-                    className={`rounded-[8px] px-4 py-2.5 text-sm transition-all cursor-pointer flex items-center gap-1.5 ${
-                      tabFilter === "archived"
-                        ? "bg-[#576686] text-white font-medium shadow-2xs"
-                        : "text-[#576686] hover:bg-slate-100"
-                    }`}
-                  >
-                    <FolderArchive className="w-4 h-4" />
-                    <span>Архив</span>
-                  </button>
-                </div>
+                {/* Кнопка «Архив курсов» на месте бывшего переключателя */}
+                <button
+                  type="button"
+                  onClick={handleOpenArchiveModal}
+                  className="rounded-[10px] px-5 py-4 text-base bg-white text-[#576686] hover:bg-slate-100 border border-gray-200 transition-all cursor-pointer flex items-center gap-2 shadow-xs"
+                >
+                  <FolderArchive className="w-4 h-4 text-[#2ABAEF]" />
+                  <span>Архив курсов</span>
+                </button>
 
                 {viewMode === "calendar" && (
                   <div className="flex items-center gap-3 ml-2 animate-fadeIn">
@@ -426,7 +435,6 @@ export default function Schedule() {
                               {course.title}
                             </div>
 
-                            {/* Крупный город по левому краю */}
                             <div className="w-[180px] text-[18px] font-bold text-[#576686] text-left truncate">
                               {course.location || "Чебоксары"}
                             </div>
@@ -436,20 +444,6 @@ export default function Schedule() {
                                 <UserBadgeIcon className="w-3.5 h-3.5 text-white" />
                                 <span className="font-medium">{studentsList.length}/{maxStudents}</span>
                               </div>
-
-                              {/* Кнопка архивации */}
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleArchive(course._id, e)}
-                                title={course.isArchived ? "Восстановить из архива" : "В архив"}
-                                className={`size-7 flex items-center justify-center rounded-full transition-all cursor-pointer ${
-                                  course.isArchived 
-                                    ? "bg-amber-100 text-amber-700 hover:bg-amber-200" 
-                                    : "bg-[#F5F7FA] text-[#576686] hover:bg-stone-200"
-                                }`}
-                              >
-                                <Archive className="w-4 h-4" />
-                              </button>
 
                               <button
                                 type="button"
@@ -577,7 +571,7 @@ export default function Schedule() {
                                 );
                               })}
 
-                              {freeSlotsCount > 0 && tabFilter === "active" && (
+                              {freeSlotsCount > 0 && (
                                 <div
                                   onClick={() => handleOpenAddStudent(course._id)}
                                   className="flex items-center h-14 px-5 rounded-[10px] border-2 border-dashed border-[#576686]/40 bg-white text-[#576686] hover:border-[#2ABAEF] hover:text-[#2ABAEF] hover:bg-[#2ABAEF]/5 transition-all cursor-pointer group"
@@ -589,7 +583,7 @@ export default function Schedule() {
                                 </div>
                               )}
 
-                              {freeSlotsCount > 1 && tabFilter === "active" &&
+                              {freeSlotsCount > 1 &&
                                 Array.from({ length: freeSlotsCount - 1 }).map((_, slotIdx) => (
                                   <div
                                     key={`empty-slot-${slotIdx}`}
@@ -607,7 +601,7 @@ export default function Schedule() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-[#576686]/60">
-                    <p className="text-base font-medium">Событий в этой категории нет</p>
+                    <p className="text-base font-medium">Нет активных событий</p>
                   </div>
                 )}
               </div>
@@ -669,6 +663,125 @@ export default function Schedule() {
           </div>
         </div>
       </div>
+
+      {/* Модалка: Архив курсов и список участников */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[850px] max-h-[85vh] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200 flex flex-col">
+            <button
+              type="button"
+              onClick={() => setIsArchiveModalOpen(false)}
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-white text-[#576686] hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <FolderArchive className="w-6 h-6 text-[#2ABAEF]" />
+              <h2 className="text-[20px] font-bold text-[#576686]">
+                {selectedArchivedCourseType ? selectedArchivedCourseType : "Архив обучающих курсов"}
+              </h2>
+            </div>
+
+            {!selectedArchivedCourseType ? (
+              // Список видов курсов
+              <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3">
+                {uniqueArchivedTypes.length > 0 ? (
+                  uniqueArchivedTypes.map((courseTitle) => {
+                    const totalStudents = archivedCourses
+                      .filter((c) => c.title === courseTitle)
+                      .reduce((acc, c) => acc + (c.students?.length || 0), 0);
+
+                    return (
+                      <div
+                        key={courseTitle}
+                        onClick={() => setSelectedArchivedCourseType(courseTitle)}
+                        className="flex items-center justify-between p-5 bg-white rounded-[10px] border border-gray-100 shadow-xs hover:shadow-md hover:border-[#2ABAEF]/40 hover:-translate-y-0.5 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="size-9 rounded-md bg-[#2ABAEF]/10 text-[#2ABAEF] flex items-center justify-center">
+                            <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <span className="text-[16px] font-bold text-[#576686] group-hover:text-[#2ABAEF] transition-colors">
+                            {courseTitle}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-[#576686]/60 bg-[#F5F7FA] px-3 py-1.5 rounded-full">
+                            Прошли обучение: <b>{totalStudents}</b> чел.
+                          </span>
+                          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#2ABAEF] group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-48 text-[#576686]/60">
+                    <p className="text-sm">Архив пока пуст. Курсы переместятся сюда автоматически после завершения дат.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Список участников выбранного типа курса (от свежих к старым)
+              <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedArchivedCourseType(null)}
+                  className="self-start text-xs font-semibold text-[#2ABAEF] hover:underline mb-2 flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Вернуться к списку курсов архива</span>
+                </button>
+
+                {archivedStudentsOfSelectedType.length > 0 ? (
+                  archivedStudentsOfSelectedType.map((item: any, idx: number) => {
+                    const client = item.client || {};
+                    const isCompany = client.type === "company";
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => client._id && navigate(`/clients/detail?id=${client._id}`)}
+                        className="flex items-center justify-between p-4 bg-white rounded-[10px] border border-gray-100 shadow-xs hover:border-[#2ABAEF]/40 cursor-pointer transition-all"
+                      >
+                        <div className="flex items-center gap-3 min-w-[260px]">
+                          <div className="size-8 rounded-full bg-[#F5F7FA] flex items-center justify-center text-[#576686] shrink-0">
+                            {isCompany ? <Building className="w-4 h-4" /> : <UserIconLucide className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-[#576686] hover:text-[#2ABAEF] transition-colors">{client.name || "Клиент"}</p>
+                            <p className="text-xs text-[#576686]/60">{client.city || "Город не указан"} {client.activity ? `/ ${client.activity}` : ""}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-[#576686] min-w-[180px]">
+                          <Calendar className="w-3.5 h-3.5 text-[#2ABAEF]" />
+                          <span>{item.courseDate}</span>
+                        </div>
+
+                        <div className="text-xs text-[#576686]/80 min-w-[120px]">
+                          {item.courseLocation || "Чебоксары"}
+                        </div>
+
+                        <div className="text-right">
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-medium uppercase text-white ${
+                            item.paymentStatus === "paid" ? "bg-[#22C55E]" : "bg-[#3B82F6]"
+                          }`}>
+                            {item.paymentStatus === "paid" ? "Оплачено" : "Аванс"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-center text-[#576686]/50 py-8">На этом курсе пока не было зарегистрированных участников</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Модалка: Управление типами курсов */}
       {isCourseTypesModalOpen && (

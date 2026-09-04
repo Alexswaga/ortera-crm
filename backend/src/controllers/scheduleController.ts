@@ -1,18 +1,46 @@
 import { Request, Response } from "express";
 import { ScheduleEvent } from "../models/ScheduleEvent";
 
-// 1. Получение событий
+// Парсер даты строкового формата "DD.MM.YYYY" с выставлением конца дня (23:59:59)
+const parseEventEndDate = (dStr?: string): Date | null => {
+  if (!dStr) return null;
+  const trimmed = dStr.trim();
+  const parts = trimmed.split(".");
+  if (parts.length === 3) {
+    const day = Number(parts[0]);
+    const month = Number(parts[1]) - 1;
+    const year = Number(parts[2]);
+    return new Date(year, month, day, 23, 59, 59, 999);
+  }
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+// 1. Получение событий (с автопереносом в архив по дате)
 export const getScheduleEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const { isArchived } = req.query;
-    const filter: Record<string, any> = {};
 
+    // Автоматическая проверка и перенос завершившихся активных курсов в архив
+    const activeEvents = await ScheduleEvent.find({ isArchived: false });
+    const now = new Date();
+
+    for (const event of activeEvents) {
+      const dateToCheck = event.endDate || event.startDate;
+      const endDateTime = parseEventEndDate(dateToCheck);
+      if (endDateTime && endDateTime < now) {
+        event.isArchived = true;
+        await event.save();
+      }
+    }
+
+    const filter: Record<string, any> = {};
     if (isArchived !== undefined) {
       filter.isArchived = isArchived === "true";
     }
 
     const events = await ScheduleEvent.find(filter)
-      .populate("students.client", "name activity city phone manager")
+      .populate("students.client", "name activity city phone manager type")
       .populate("students.manager", "name email phone")
       .sort({ createdAt: -1 });
 
@@ -57,7 +85,7 @@ export const updateScheduleEvent = async (req: Request, res: Response): Promise<
     }
 
     const updated = await ScheduleEvent.findByIdAndUpdate(id, updateData, { new: true })
-      .populate("students.client", "name activity city phone manager")
+      .populate("students.client", "name activity city phone manager type")
       .populate("students.manager", "name");
 
     if (!updated) {
@@ -112,7 +140,7 @@ export const addStudentToEvent = async (req: Request, res: Response): Promise<vo
 
     await event.save();
     const populated = await event.populate([
-      { path: "students.client", select: "name activity city phone manager" },
+      { path: "students.client", select: "name activity city phone manager type" },
       { path: "students.manager", select: "name" },
     ]);
 
@@ -144,7 +172,7 @@ export const updateStudentPaymentStatus = async (req: Request, res: Response): P
     await event.save();
 
     const populated = await event.populate([
-      { path: "students.client", select: "name activity city phone manager" },
+      { path: "students.client", select: "name activity city phone manager type" },
       { path: "students.manager", select: "name" },
     ]);
 
@@ -172,7 +200,7 @@ export const removeStudentFromEvent = async (req: Request, res: Response): Promi
     await event.save();
 
     const populated = await event.populate([
-      { path: "students.client", select: "name activity city phone manager" },
+      { path: "students.client", select: "name activity city phone manager type" },
       { path: "students.manager", select: "name" },
     ]);
 
