@@ -22,6 +22,7 @@ import Managers from "./pages/Managers";
 import AddManager from "./pages/AddManager";
 import ManagerDetail from "./pages/ManagerDetail";
 import Settings from "./pages/Settings";
+import Stats from "./pages/Stats";
 
 // Страницы Менеджера
 import ClientTaskList from "./pages/client/ClientTaskList";
@@ -31,6 +32,7 @@ import ClientAddClient from "./pages/client/ClientAddClient";
 import ClientClientDetail from "./pages/client/ClientClientDetail";
 import ClientSchedule from "./pages/client/ClientSchedule";
 import ClientAddEvent from "./pages/client/ClientAddEvent";
+import ClientStats from "./pages/client/ClientStats";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -79,6 +81,7 @@ export default function App() {
             <Route path="/managers/add" element={<AddManager />} />
             <Route path="/managers/detail" element={<ManagerDetail />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/stats" element={<Stats />} />
           </Route>
 
           {/* ================= КАБИНЕТ МЕНЕДЖЕРА (/client) ================= */}
@@ -97,6 +100,7 @@ export default function App() {
             <Route path="clients/detail" element={<ClientClientDetail />} />
             <Route path="schedule" element={<ClientSchedule />} />
             <Route path="schedule/add" element={<ClientAddEvent />} />
+            <Route path="stats" element={<ClientStats />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/auth" replace />} />

@@ -31,6 +31,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
 
     const clients = await Client.find(filter)
       .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone")
       .sort({ createdAt: -1 });
 
     const clientsWithCount = await Promise.all(
@@ -57,7 +58,9 @@ export const getClientById = async (req: Request, res: Response): Promise<void> 
   try {
     const id = String(req.params.id);
 
-    const client = await Client.findById(id).populate("manager", "name email phone");
+    const client = await Client.findById(id)
+      .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone");
     if (!client) {
       res.status(404).json({ message: "Клиент не найден" });
       return;
@@ -80,7 +83,7 @@ export const getClientById = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// 3. Создание клиента с жесткой проверкой дубликатов
+// 3. Создание клиента с жесткой проверкой дубликатов и сохранением originalManager
 export const createClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const clientData = req.body;
@@ -116,8 +119,15 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
       clientData.manager = authUser.id || authUser._id;
     }
 
+    // Фиксируем исходного менеджера при создании
+    if (!clientData.originalManager) {
+      clientData.originalManager = clientData.manager || (authUser?.id || authUser?._id);
+    }
+
     const client = await Client.create(clientData);
-    const populated = await Client.findById(client._id).populate("manager", "name email phone");
+    const populated = await Client.findById(client._id)
+      .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone");
 
     res.status(201).json(populated);
   } catch (error) {
@@ -135,7 +145,9 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
       id,
       { $set: updateData },
       { new: true }
-    ).populate("manager", "name email phone");
+    )
+      .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone");
 
     if (!updated) {
       res.status(404).json({ message: "Клиент не найден" });
@@ -186,6 +198,9 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
       text: text.trim(),
     });
 
+    // Фиксируем дату контакта при добавлении заметки
+    await Client.findByIdAndUpdate(id, { lastContactDate: new Date() });
+
     res.status(201).json(note);
   } catch (error) {
     res.status(400).json({ message: "Ошибка при добавлении заметки", error });
@@ -203,16 +218,28 @@ export const transferClient = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const updatedClient = await Client.findByIdAndUpdate(
-      id,
-      { $set: { manager: newManagerId } },
-      { new: true }
-    ).populate("manager", "name email phone");
-
-    if (!updatedClient) {
+    const currentClient = await Client.findById(id);
+    if (!currentClient) {
       res.status(404).json({ message: "Клиент не найден" });
       return;
     }
+
+    // Если originalManager ещё не был сохранён, фиксируем того, кто сейчас передает
+    const originalManagerId = currentClient.originalManager || currentClient.manager;
+
+    const updatedClient = await Client.findByIdAndUpdate(
+      id,
+      { 
+        $set: { 
+          manager: newManagerId,
+          originalManager: originalManagerId,
+          lastContactDate: new Date()
+        } 
+      },
+      { new: true }
+    )
+      .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone");
 
     await Task.updateMany(
       { client: id as any, status: { $in: ["in_work", "overdue"] } },

@@ -156,3 +156,10 @@ export const settingsApi = {
     return data;
   },
 };
+
+export const statsApi = {
+  get: async (managerId?: string) => {
+    const { data } = await api.get("/stats", { params: { managerId } });
+    return data;
+  },
+};

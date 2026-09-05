@@ -24,6 +24,7 @@ export interface IClient extends Document {
   phone?: string;
   messengers: IMessenger[];
   manager?: Types.ObjectId;
+  originalManager?: Types.ObjectId; // <-- Первый менеджер клиента (для начисления 1% при передаче)
   status: "Лид" | "Покупатель";
   isActive: boolean;
   isCeased: boolean;
@@ -52,6 +53,7 @@ const ClientSchema = new Schema<IClient>(
       },
     ],
     manager: { type: Schema.Types.ObjectId, ref: "User" },
+    originalManager: { type: Schema.Types.ObjectId, ref: "User" },
     status: { type: String, enum: ["Лид", "Покупатель"], default: "Лид" },
     isActive: { type: Boolean, default: true },
     isCeased: { type: Boolean, default: false },

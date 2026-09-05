@@ -11,6 +11,7 @@ import taskRoutes from "./routes/taskRoutes";
 import managerRoutes from "./routes/managerRoutes";
 import scheduleRoutes from "./routes/scheduleRoutes";
 import settingRoutes from "./routes/settingRoutes";
+import statsRoutes from "./routes/statsRoutes";
 
 const app: Application = express();
 
@@ -70,6 +71,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/managers", managerRoutes);
 app.use("/api/schedule", scheduleRoutes);
 app.use("/api/settings", settingRoutes);
+app.use("/api/stats", statsRoutes);
 
 // Healthcheck
 app.get("/api/health", (_req: Request, res: Response) => {

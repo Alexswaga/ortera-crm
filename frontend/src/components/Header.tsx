@@ -24,6 +24,19 @@ function SettingsGearIcon({ className = "" }: { className?: string }) {
   );
 }
 
+function AnalyticsChartIcon({ className = "w-4 h-4 shrink-0" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 13.5H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M3.5 11V13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M7 7.5V13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M10.5 4.5V13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M14 2V13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3 8L6.5 4.5L10 6.5L14 2" stroke="#2ABAEF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const adminNavItems = [
   {
     to: "/",
@@ -86,7 +99,7 @@ const adminNavItems = [
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5">
         <g clipPath="url(#clip0_18_169_admin)">
           <path opacity="0.3" d="M12.6693 4H3.33594V5.33333H12.6693V4Z" fill="currentColor" />
-          <path d="M12.6667 2.66634H12V1.33301H10.6667V2.66634H5.33333V1.33301H4V2.66634H3.33333C2.59333 2.66634 2.00667 3.26667 2.00667 3.99967L2 13.333C2 14.0663 2.59333 14.6663 3.33333 14.6663H12.6667C13.4026 14 14 13.4 14 13.333V3.99967C14 3.26634 13.4 2.66634 12.6667 2.66634ZM12.6667 13.333H3.33333V6.66634H12.6667V13.333ZM12.6667 5.33301H3.33333V3.99967H12.6667V5.33301ZM6 9.33301H4.66667V7.99967H6V9.33301ZM8.66667 9.33301H7.33333V7.99967H8.66667V9.33301ZM11.3333 9.33301H10V7.99967H11.3333V9.33301ZM6 11.9997H4.66667V10.6663H6V11.9997ZM8.66667 11.9997H7.33333V10.6663H8.66667V11.9997ZM11.3333 11.9997H10V10.6663H11.3333V11.9997Z" fill="currentColor" />
+          <path d="M12.6667 2.66634H12V1.33301H10.6667V2.66634H5.33333V1.33301H4V2.66634H3.33333C2.59333 2.66634 2.00667 3.26667 2.00667 3.99967L2 13.333C2 14.0663 2.59333 14.6663 3.33333 14.6663H12.6667C13.4 14.6663 14 14.0663 14 13.333V3.99967C14 3.26634 13.4 2.66634 12.6667 2.66634ZM12.6667 13.333H3.33333V6.66634H12.6667V13.333ZM12.6667 5.33301H3.33333V3.99967H12.6667V5.33301ZM6 9.33301H4.66667V7.99967H6V9.33301H8.66667H7.33333V7.99967H8.66667V9.33301ZM11.3333 9.33301H10V7.99967H11.3333V9.33301ZM6 11.9997H4.66667V10.6663H6V11.9997ZM8.66667 11.9997H7.33333V10.6663H8.66667V11.9997ZM11.3333 11.9997H10V10.6663H11.3333V11.9997Z" fill="currentColor" />
         </g>
         <defs>
           <clipPath id="clip0_18_169_admin">
@@ -95,6 +108,11 @@ const adminNavItems = [
         </defs>
       </svg>
     ),
+  },
+  {
+    to: "/stats",
+    label: "Статистика",
+    icon: <AnalyticsChartIcon />,
   },
 ];
 
