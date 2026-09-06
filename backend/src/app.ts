@@ -12,6 +12,7 @@ import managerRoutes from "./routes/managerRoutes";
 import scheduleRoutes from "./routes/scheduleRoutes";
 import settingRoutes from "./routes/settingRoutes";
 import statsRoutes from "./routes/statsRoutes";
+import oneCRoutes from "./routes/oneCRoutes";
 
 const app: Application = express();
 
@@ -60,8 +61,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // 4. API Маршруты
 app.use("/api/auth/login", loginLimiter);
@@ -72,13 +73,14 @@ app.use("/api/managers", managerRoutes);
 app.use("/api/schedule", scheduleRoutes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/1c", oneCRoutes);
 
 // Healthcheck
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// 5. Обработка статики и SPA (совместимо с Express 4 и 5)
+// 5. Обработка статики и SPA
 const clientBuildPath = path.join(__dirname, "../../frontend/dist");
 app.use(express.static(clientBuildPath));
 

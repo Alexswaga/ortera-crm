@@ -1,6 +1,6 @@
 import React, { useState, useEffect, FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, Plus, X, Ban, Trash2, GraduationCap } from "lucide-react";
+import { ChevronDown, Plus, X, Ban, Trash2, GraduationCap, Gift } from "lucide-react";
 import { clientsApi } from "../../api/services";
 import { formatCapitalizeWords, formatCapitalizeFirst, formatPhone, formatINN } from "../../utils/formatters";
 import CitySuggestInput from "../../components/CitySuggestInput";
@@ -17,7 +17,7 @@ function SaveFloppyIcon({ className = "w-4 h-4 text-white" }: { className?: stri
   return (
     <svg className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
-        d="M13 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H11L14 5V13C14 13.5523 13.5523 14 13 14Z"
+        d="M13 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H11L14 5V13C14 13.5523 13.0523 14 13 14Z"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -66,6 +66,7 @@ export default function ClientAddClient() {
   const [clientType, setClientType] = useState<"individual" | "company">("individual");
   const [isCeased, setIsCeased] = useState(false);
   const [wantsToLearn, setWantsToLearn] = useState(false);
+  const [isTrialSent, setIsTrialSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const [isMessengerModalOpen, setIsMessengerModalOpen] = useState(false);
@@ -121,6 +122,7 @@ export default function ClientAddClient() {
             setClientType(c.type || "individual");
             setIsCeased(c.isCeased || false);
             setWantsToLearn(Boolean(c.wantsToLearn));
+            setIsTrialSent(Boolean(c.isTrialSent));
             setFormData({
               inn: c.inn || "",
               orgName: c.type === "company" ? c.name : "",
@@ -249,6 +251,7 @@ export default function ClientAddClient() {
         isCeased: isCeased,
         isActive: !isCeased,
         wantsToLearn: Boolean(wantsToLearn),
+        isTrialSent: Boolean(isTrialSent),
         status: "Лид",
         tags: [],
         messengers: messengersList.filter((m) => m.url.trim().length > 0),
@@ -288,29 +291,44 @@ export default function ClientAddClient() {
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 shadow-xs flex flex-col justify-between min-h-[674px]">
           <form onSubmit={handleSubmit} className="flex flex-col justify-between h-full">
             <div>
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
                 <h1 className="text-[18px] font-bold text-[#576686]">
                   {isEditing ? "Редактирование клиента" : "Добавление клиента"}
                 </h1>
 
-                {/* Чекбокс «Желающий обучаться» */}
-                <label className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-md border border-gray-200 cursor-pointer hover:border-[#2ABAEF] transition-all select-none shadow-2xs">
-                  <input
-                    type="checkbox"
-                    checked={wantsToLearn}
-                    onChange={(e) => setWantsToLearn(e.target.checked)}
-                    className="size-4.5 rounded border-gray-300 text-[#2ABAEF] focus:ring-[#2ABAEF] cursor-pointer accent-[#2ABAEF]"
-                  />
-                  <GraduationCap className={`size-4 transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]/60"}`} />
-                  <span className={`text-sm font-medium transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]"}`}>
-                    Желающий обучаться
-                  </span>
-                </label>
+                <div className="flex items-center gap-3">
+                  {/* Чекбокс «Отправлен пробник» */}
+                  <label className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-md border border-gray-200 cursor-pointer hover:border-purple-400 transition-all select-none shadow-2xs">
+                    <input
+                      type="checkbox"
+                      checked={isTrialSent}
+                      onChange={(e) => setIsTrialSent(e.target.checked)}
+                      className="size-4.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-600"
+                    />
+                    <Gift className={`size-4 transition-colors ${isTrialSent ? "text-purple-600" : "text-[#576686]/60"}`} />
+                    <span className={`text-sm font-medium transition-colors ${isTrialSent ? "text-purple-700" : "text-[#576686]"}`}>
+                      Отправлен пробник
+                    </span>
+                  </label>
+
+                  {/* Чекбокс «Желающий обучаться» */}
+                  <label className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-md border border-gray-200 cursor-pointer hover:border-[#2ABAEF] transition-all select-none shadow-2xs">
+                    <input
+                      type="checkbox"
+                      checked={wantsToLearn}
+                      onChange={(e) => setWantsToLearn(e.target.checked)}
+                      className="size-4.5 rounded border-gray-300 text-[#2ABAEF] focus:ring-[#2ABAEF] cursor-pointer accent-[#2ABAEF]"
+                    />
+                    <GraduationCap className={`size-4 transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]/60"}`} />
+                    <span className={`text-sm font-medium transition-colors ${wantsToLearn ? "text-[#2ABAEF]" : "text-[#576686]"}`}>
+                      Желающий обучаться
+                    </span>
+                  </label>
+                </div>
               </div>
 
               {clientType === "individual" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-6">
-                  {/* 1. Тип */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Тип
@@ -328,7 +346,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 2. ФИО */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       ФИО
@@ -345,7 +362,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 3. Деятельность */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Деятельность
@@ -366,7 +382,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 4. Город */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Город / Населенный пункт
@@ -379,7 +394,6 @@ export default function ClientAddClient() {
                     />
                   </div>
 
-                  {/* 5. E-mail */}
                   <div className="group flex flex-col gap-2">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.emailMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -403,7 +417,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 6. Телефон */}
                   <div className="group flex flex-col gap-2 relative">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.phoneMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -449,9 +462,7 @@ export default function ClientAddClient() {
                   </div>
                 </div>
               ) : (
-                /* Сетка для Организации */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-[30px] gap-y-6">
-                  {/* 1. Тип */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Тип
@@ -469,7 +480,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 2. ИНН */}
                   <div className="group flex flex-col gap-2">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.innMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -493,7 +503,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 3. Название организации */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Название организации
@@ -510,7 +519,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 4. Деятельность */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Деятельность
@@ -531,7 +539,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 5. Город */}
                   <div className="group flex flex-col gap-2">
                     <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
                       Город / Населенный пункт
@@ -544,7 +551,6 @@ export default function ClientAddClient() {
                     />
                   </div>
 
-                  {/* 6. E-mail */}
                   <div className="group flex flex-col gap-2">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.emailMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -568,7 +574,6 @@ export default function ClientAddClient() {
                     </div>
                   </div>
 
-                  {/* 7. Телефон */}
                   <div className="group flex flex-col gap-2 relative">
                     <label className={`text-xs font-medium transition-colors ${
                       duplicateState.phoneMatch ? "text-[#B77C70]" : "text-[#576686] group-focus-within:text-[#2ABAEF]"
@@ -615,7 +620,7 @@ export default function ClientAddClient() {
                 </div>
               )}
 
-              {/* Блок сотрудников */}
+              {/* Сотрудники */}
               {clientType === "company" && (
                 <div className="mt-10 animate-fadeIn">
                   <h2 className="text-[18px] font-bold text-[#576686] mb-6">
@@ -733,7 +738,7 @@ export default function ClientAddClient() {
                 </div>
               )}
 
-              {/* Мессенджеры: кнопка добавления сделана изолированной (w-fit) */}
+              {/* Мессенджеры */}
               <div className="mt-8">
                 <h2 className="text-[18px] font-bold text-[#576686] mb-6">Мессенджеры</h2>
                 <div className="flex flex-col gap-3 max-w-[705px]">
@@ -765,7 +770,6 @@ export default function ClientAddClient() {
                     </div>
                   ))}
 
-                  {/* Изолированная кнопка добавления мессенджера (клик в пустоту теперь не срабатывает) */}
                   <div className="mt-2 flex">
                     <button
                       type="button"
@@ -784,7 +788,6 @@ export default function ClientAddClient() {
               </div>
             </div>
 
-            {/* Кнопки: «Сохранить и выйти» */}
             <div className="mt-12 flex flex-wrap items-center justify-between gap-4">
               {clientType === "individual" ? (
                 <button

@@ -6,18 +6,22 @@ import { Note } from "../models/Note";
 // 1. Получение списка клиентов
 export const getClients = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { type, status, search, isActive, wantsToLearn } = req.query;
+    const { type, status, search, isActive, wantsToLearn, partnerId } = req.query;
     const filter: Record<string, any> = {};
     const authUser = (req as any).user;
 
     if (authUser?.role === "manager") {
       filter.manager = authUser.id || authUser._id;
+    } else if (authUser?.role === "partner") {
+      // Сетевой партнёр видит только покупателей, которых он привёл
+      filter.partner = authUser.id || authUser._id;
     }
 
     if (type) filter.type = String(type);
     if (status) filter.status = String(status);
     if (isActive !== undefined) filter.isActive = isActive === "true";
     if (wantsToLearn !== undefined) filter.wantsToLearn = wantsToLearn === "true";
+    if (partnerId) filter.partner = String(partnerId);
 
     if (search) {
       const searchStr = String(search);
@@ -32,6 +36,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
     const clients = await Client.find(filter)
       .populate("manager", "name email phone")
       .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone")
       .sort({ createdAt: -1 });
 
     const clientsWithCount = await Promise.all(
@@ -53,14 +58,16 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// 2. Получение детальной карточки клиента
+// 2. Получение детальной карточки
 export const getClientById = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
 
     const client = await Client.findById(id)
       .populate("manager", "name email phone")
-      .populate("originalManager", "name email phone");
+      .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone");
+
     if (!client) {
       res.status(404).json({ message: "Клиент не найден" });
       return;
@@ -73,17 +80,13 @@ export const getClientById = async (req: Request, res: Response): Promise<void> 
       Note.find({ client: id as any }).sort({ createdAt: -1 }),
     ]);
 
-    res.json({
-      client,
-      tasks,
-      notes,
-    });
+    res.json({ client, tasks, notes });
   } catch (error) {
     res.status(500).json({ message: "Ошибка при получении данных клиента", error });
   }
 };
 
-// 3. Создание клиента с жесткой проверкой дубликатов и сохранением originalManager
+// 3. Создание (Лид или сразу Покупатель)
 export const createClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const clientData = req.body;
@@ -119,15 +122,21 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
       clientData.manager = authUser.id || authUser._id;
     }
 
-    // Фиксируем исходного менеджера при создании
     if (!clientData.originalManager) {
       clientData.originalManager = clientData.manager || (authUser?.id || authUser?._id);
+    }
+
+    // Если сразу создается как Покупатель — фиксируем дату конвертации
+    if (clientData.status === "Покупатель") {
+      clientData.convertedToBuyerAt = new Date();
+      clientData.oneCFolder = clientData.partner ? "Сетевые партнеры" : "Основные покупатели";
     }
 
     const client = await Client.create(clientData);
     const populated = await Client.findById(client._id)
       .populate("manager", "name email phone")
-      .populate("originalManager", "name email phone");
+      .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone");
 
     res.status(201).json(populated);
   } catch (error) {
@@ -135,11 +144,15 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// 4. Обновление клиента
+// 4. Обновление
 export const updateClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
     const updateData = req.body;
+
+    if (updateData.partner) {
+      updateData.oneCFolder = "Сетевые партнеры";
+    }
 
     const updated = await Client.findByIdAndUpdate(
       id,
@@ -147,7 +160,8 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
       { new: true }
     )
       .populate("manager", "name email phone")
-      .populate("originalManager", "name email phone");
+      .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone");
 
     if (!updated) {
       res.status(404).json({ message: "Клиент не найден" });
@@ -160,7 +174,39 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-// 5. Переключение активности клиента
+// 5. Переход Лида в Покупателя (Момент первой реализации)
+export const convertToBuyer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const client = await Client.findById(id);
+
+    if (!client) {
+      res.status(404).json({ message: "Клиент не найден" });
+      return;
+    }
+
+    client.status = "Покупатель";
+    client.convertedToBuyerAt = new Date();
+    client.oneCFolder = client.partner ? "Сетевые партнеры" : "Основные покупатели";
+    client.isSyncedWithOneC = true; // Готов к приёму накладных из 1С
+
+    await client.save();
+
+    const populated = await Client.findById(id)
+      .populate("manager", "name email phone")
+      .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone");
+
+    res.json({
+      message: "Клиент успешно переведён в статус Покупателя и готов к обмену с 1С",
+      client: populated,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Ошибка при конвертации Лида в Покупателя", error });
+  }
+};
+
+// 6. Переключение активности
 export const toggleClientActive = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
@@ -180,7 +226,7 @@ export const toggleClientActive = async (req: Request, res: Response): Promise<v
   }
 };
 
-// 6. Добавление заметки к клиенту
+// 7. Добавление заметки
 export const addClientNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
@@ -198,7 +244,6 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
       text: text.trim(),
     });
 
-    // Фиксируем дату контакта при добавлении заметки
     await Client.findByIdAndUpdate(id, { lastContactDate: new Date() });
 
     res.status(201).json(note);
@@ -207,7 +252,7 @@ export const addClientNote = async (req: Request, res: Response): Promise<void> 
   }
 };
 
-// 7. Передача клиента новому менеджеру
+// 8. Передача другому менеджеру
 export const transferClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
@@ -224,7 +269,6 @@ export const transferClient = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Если originalManager ещё не был сохранён, фиксируем того, кто сейчас передает
     const originalManagerId = currentClient.originalManager || currentClient.manager;
 
     const updatedClient = await Client.findByIdAndUpdate(
@@ -239,7 +283,8 @@ export const transferClient = async (req: Request, res: Response): Promise<void>
       { new: true }
     )
       .populate("manager", "name email phone")
-      .populate("originalManager", "name email phone");
+      .populate("originalManager", "name email phone")
+      .populate("partner", "name email phone");
 
     await Task.updateMany(
       { client: id as any, status: { $in: ["in_work", "overdue"] } },
@@ -255,7 +300,7 @@ export const transferClient = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// 8. Удаление клиента
+// 9. Удаление
 export const deleteClient = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);

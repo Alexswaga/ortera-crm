@@ -23,12 +23,17 @@ export interface IClient extends Document {
   email?: string;
   phone?: string;
   messengers: IMessenger[];
-  manager?: Types.ObjectId;
-  originalManager?: Types.ObjectId; // <-- Первый менеджер клиента (для начисления 1% при передаче)
-  status: "Лид" | "Покупатель";
+  manager?: Types.ObjectId;         // Штатный ответственный менеджер
+  originalManager?: Types.ObjectId; // Исходный менеджер для 1%
+  partner?: Types.ObjectId;         // Ссылка на сетевого партнёра
+  status: "Лид" | "Покупатель";     // Разделение: Лиды не идут в 1С, Покупатели идут
+  convertedToBuyerAt?: Date;        // Момент перехода Лида в статус Покупателя (реализация)
+  isSyncedWithOneC: boolean;        // Флаг выгрузки в 1C
+  oneCFolder?: string;              // Папка в 1С (напр. "Сетевые партнеры" или "Основные покупатели")
   isActive: boolean;
   isCeased: boolean;
-  wantsToLearn: boolean; // <-- Чекбокс «Желающий обучаться»
+  wantsToLearn: boolean;
+  isTrialSent: boolean;
   tags: string[];
   employees: IEmployee[];
   lastContactDate: Date;
@@ -54,10 +59,15 @@ const ClientSchema = new Schema<IClient>(
     ],
     manager: { type: Schema.Types.ObjectId, ref: "User" },
     originalManager: { type: Schema.Types.ObjectId, ref: "User" },
+    partner: { type: Schema.Types.ObjectId, ref: "User" },
     status: { type: String, enum: ["Лид", "Покупатель"], default: "Лид" },
+    convertedToBuyerAt: { type: Date },
+    isSyncedWithOneC: { type: Boolean, default: false },
+    oneCFolder: { type: String, default: "Основные покупатели" },
     isActive: { type: Boolean, default: true },
     isCeased: { type: Boolean, default: false },
     wantsToLearn: { type: Boolean, default: false },
+    isTrialSent: { type: Boolean, default: false },
     tags: [{ type: String, trim: true }],
     employees: [
       {

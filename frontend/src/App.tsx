@@ -2,9 +2,10 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SearchProvider } from "./context/SearchContext";
 
-// Макеты (Layouts)
+// Макеты
 import MainLayout from "./layouts/MainLayout";
 import ClientLayout from "./layouts/ClientLayout";
+import PartnerLayout from "./layouts/PartnerLayout";
 
 // Авторизация и уведомления
 import Auth from "./pages/Auth";
@@ -34,21 +35,26 @@ import ClientSchedule from "./pages/client/ClientSchedule";
 import ClientAddEvent from "./pages/client/ClientAddEvent";
 import ClientStats from "./pages/client/ClientStats";
 
+// Страница Сетевого Партнёра
+import PartnerStats from "./pages/partner/PartnerStats";
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: ("admin" | "manager" | "client")[];
+  allowedRoles?: ("admin" | "manager" | "partner" | "client")[];
 }
 
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const token = localStorage.getItem("token");
-  const userRole = (localStorage.getItem("userRole") || "manager") as "admin" | "manager" | "client";
+  const userRole = (localStorage.getItem("userRole") || "manager") as "admin" | "manager" | "partner" | "client";
 
   if (!token) {
     return <Navigate to="/auth" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(userRole)) {
-    return <Navigate to={userRole === "admin" ? "/" : "/client"} replace />;
+    if (userRole === "admin") return <Navigate to="/" replace />;
+    if (userRole === "partner") return <Navigate to="/partner" replace />;
+    return <Navigate to="/client" replace />;
   }
 
   return <>{children}</>;
@@ -62,7 +68,7 @@ export default function App() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/notification" element={<Notification />} />
 
-          {/* ================= КАБИНЕТ АДМИНИСТРАТОРА (/) ================= */}
+          {/* КАБИНЕТ АДМИНИСТРАТОРА (/) */}
           <Route
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
@@ -84,7 +90,7 @@ export default function App() {
             <Route path="/stats" element={<Stats />} />
           </Route>
 
-          {/* ================= КАБИНЕТ МЕНЕДЖЕРА (/client) ================= */}
+          {/* КАБИНЕТ МЕНЕДЖЕРА (/client) */}
           <Route
             path="/client"
             element={
@@ -101,6 +107,18 @@ export default function App() {
             <Route path="schedule" element={<ClientSchedule />} />
             <Route path="schedule/add" element={<ClientAddEvent />} />
             <Route path="stats" element={<ClientStats />} />
+          </Route>
+
+          {/* КАБИНЕТ СЕТЕВОГО ПАРТНЁРА (/partner) */}
+          <Route
+            path="/partner"
+            element={
+              <ProtectedRoute allowedRoles={["partner"]}>
+                <PartnerLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<PartnerStats />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/auth" replace />} />

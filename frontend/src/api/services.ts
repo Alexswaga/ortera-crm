@@ -23,7 +23,7 @@ export const authApi = {
 };
 
 export const clientsApi = {
-  getAll: async (params?: { type?: string; status?: string; search?: string; isActive?: boolean; wantsToLearn?: boolean }) => {
+  getAll: async (params?: { type?: string; status?: string; search?: string; isActive?: boolean; wantsToLearn?: boolean; partnerId?: string }) => {
     const { data } = await api.get("/clients", { params });
     return data;
   },
@@ -37,6 +37,10 @@ export const clientsApi = {
   },
   update: async (id: string, clientData: any) => {
     const { data } = await api.put(`/clients/${id}`, clientData);
+    return data;
+  },
+  convertToBuyer: async (id: string) => {
+    const { data } = await api.patch(`/clients/${id}/convert-to-buyer`);
     return data;
   },
   toggleActive: async (id: string) => {
@@ -158,8 +162,12 @@ export const settingsApi = {
 };
 
 export const statsApi = {
-  get: async (managerId?: string) => {
-    const { data } = await api.get("/stats", { params: { managerId } });
+  get: async (managerId?: string, partnerId?: string) => {
+    const { data } = await api.get("/stats", { params: { managerId, partnerId } });
+    return data;
+  },
+  createPartnerOffset: async (payload: { partnerId: string; amount: number; type: string; comment?: string; date?: string }) => {
+    const { data } = await api.post("/stats/partner-offset", payload);
     return data;
   },
 };

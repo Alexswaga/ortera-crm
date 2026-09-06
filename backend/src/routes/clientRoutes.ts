@@ -4,6 +4,7 @@ import {
   getClientById,
   createClient,
   updateClient,
+  convertToBuyer,
   toggleClientActive,
   addClientNote,
   transferClient,
@@ -19,6 +20,7 @@ router.get("/", getClients);
 router.get("/:id", getClientById);
 router.post("/", createClient);
 router.put("/:id", updateClient);
+router.patch("/:id/convert-to-buyer", convertToBuyer);
 router.patch("/:id/toggle-active", toggleClientActive);
 router.post("/:id/notes", addClientNote);
 router.post("/:id/transfer", transferClient);

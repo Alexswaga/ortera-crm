@@ -15,7 +15,9 @@ import {
   Trash2,
   Search,
   GraduationCap,
-  UserCheck
+  UserCheck,
+  Gift,
+  ShoppingCart
 } from "lucide-react";
 import { clientsApi, tasksApi, settingsApi, scheduleApi, managersApi } from "../../api/services";
 
@@ -147,18 +149,17 @@ export default function ClientClientDetail() {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedTask, setSelectedTask] = useState<any>(null);
 
-  // Модальные окна
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
   const [isPostponeTaskOpen, setIsPostponeTaskOpen] = useState(false);
   const [isCompleteTaskOpen, setIsCompleteTaskOpen] = useState(false);
   const [isAddTagOpen, setIsAddTagOpen] = useState(false);
 
-  // Модалка передачи клиента
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [managersList, setManagersList] = useState<any[]>([]);
   const [selectedNewManagerId, setSelectedNewManagerId] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   const [noteText, setNoteText] = useState("");
   const [postponeDate, setPostponeDate] = useState("14:28  /  16.07.2026");
@@ -258,14 +259,16 @@ export default function ClientClientDetail() {
     }
   };
 
-  const handleToggleStatus = async () => {
+  const handleConvertToBuyer = async () => {
     if (!client?._id) return;
-    const newStatus = client.status === "Лид" ? "Покупатель" : "Лид";
-    setClient((prev: any) => ({ ...prev, status: newStatus }));
     try {
-      await clientsApi.update(client._id, { status: newStatus });
+      setIsConverting(true);
+      await clientsApi.convertToBuyer(client._id);
+      await loadClientData();
     } catch (err) {
-      console.error("Ошибка обновления статуса:", err);
+      console.error("Ошибка конвертации Лида в Покупателя:", err);
+    } finally {
+      setIsConverting(false);
     }
   };
 
@@ -318,7 +321,6 @@ export default function ClientClientDetail() {
     }
   };
 
-  // Передача клиента другому менеджеру
   const handleOpenTransferModal = () => {
     const currentMgrId = client?.manager?._id || client?.manager;
     const firstOtherMgr = managersList.find((m) => m._id !== currentMgrId);
@@ -334,7 +336,6 @@ export default function ClientClientDetail() {
       setIsTransferring(true);
       await clientsApi.transfer(client._id, selectedNewManagerId);
       setIsTransferModalOpen(false);
-      // У текущего менеджера клиент исчезает, возвращаем на страницу клиентов
       navigate("/client/clients");
     } catch (err) {
       console.error("Ошибка при передаче клиента:", err);
@@ -364,10 +365,12 @@ export default function ClientClientDetail() {
   const clientType = client?.type || "individual";
   const clientName = client?.name || "Клиент";
   const clientStatus = client?.status || "Лид";
+  const isBuyer = clientStatus === "Покупатель";
   const clientSub = client?.city ? `г. ${client.city} / ${client.activity || ""}` : client?.activity || "Клиент";
   const clientEmail = client?.email || "Не указан";
   const clientPhone = client?.phone || "Не указан";
   const currentManagerName = client?.manager?.name || "Текущий менеджер";
+  const isTrialSent = Boolean(client?.isTrialSent);
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] relative selection:bg-[#2ABAEF]/20">
@@ -387,14 +390,19 @@ export default function ClientClientDetail() {
                 </span>
 
                 <div 
-                  onClick={handleToggleStatus}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs cursor-pointer select-none transition-colors ${
-                    clientStatus === "Лид" ? "bg-sky-400 hover:bg-sky-500" : "bg-sky-500 hover:bg-sky-600"
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs select-none ${
+                    isBuyer ? "bg-emerald-500 font-bold" : "bg-sky-400 font-medium"
                   }`}
                 >
                   <span>{clientStatus}</span>
-                  <ChevronDown className="w-3.5 h-3.5" />
                 </div>
+
+                {isTrialSent && (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-purple-500/80 rounded-full text-white text-xs select-none">
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Пробник отправлен</span>
+                  </div>
+                )}
 
                 {clientType === "company" && selectedEmployee && (
                   <div className="flex items-center gap-1.5 ml-4 pl-4 border-l border-white/20 text-white text-sm font-medium">
@@ -440,6 +448,35 @@ export default function ClientClientDetail() {
             </div>
           </div>
         </div>
+
+        {/* Баннер конвертации Лида в Покупателя (Реализация 1С) */}
+        {!isBuyer && (
+          <div className="mt-6 p-5 rounded-[10px] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-4 shadow-xs animate-fadeIn">
+            <div className="flex items-center gap-3.5">
+              <div className="size-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <ShoppingCart className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900">
+                  Клиент сейчас в статусе «Лид» (переговоры)
+                </h3>
+                <p className="text-xs text-emerald-700/80 mt-0.5">
+                  Лиды не выгружаются в 1С. Когда совершена первая отгрузка или продажа, переведите клиента в «Покупатели».
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isConverting}
+              onClick={handleConvertToBuyer}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <Check className="size-4" />
+              <span>{isConverting ? "Перевод..." : "Перевести в Покупатели (Реализация 1С)"}</span>
+            </button>
+          </div>
+        )}
 
         {/* Контент */}
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[838px] mt-[30px] flex flex-col justify-between shadow-xs">
@@ -522,7 +559,6 @@ export default function ClientClientDetail() {
                 </div>
               </div>
 
-              {/* Поиск и действия: Передать клиента (левее) + Добавить заметку + Создать задачу */}
               <div className="flex items-center gap-3">
                 <div className="relative w-64 h-12 group">
                   <input
@@ -593,7 +629,7 @@ export default function ClientClientDetail() {
               </button>
             </div>
 
-            {/* Контент таба «Пройденные курсы» */}
+            {/* Таб «Пройденные курсы» */}
             {activeFilter === "courses" && (
               <div className="flex flex-col gap-4 animate-fadeIn">
                 {completedCourses.length > 0 ? (
@@ -627,12 +663,11 @@ export default function ClientClientDetail() {
               </div>
             )}
 
-            {/* Таймлайн с задачами и заметками */}
+            {/* Таймлайн */}
             {activeFilter !== "courses" && (
               <div className="relative pl-24">
                 <div className="absolute left-[78px] top-4 bottom-4 w-px bg-[#576686]" />
 
-                {/* Задачи клиента */}
                 {(activeFilter === "all" || activeFilter === "tasks") && filteredTasks.map((task) => (
                   <div key={task._id} className="relative mb-10">
                     <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
@@ -750,7 +785,6 @@ export default function ClientClientDetail() {
                   </div>
                 ))}
 
-                {/* Заметки клиента */}
                 {(activeFilter === "all" || activeFilter === "notes") && filteredNotes.map((note) => (
                   <div key={note._id} className="relative mb-10">
                     <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
@@ -773,7 +807,7 @@ export default function ClientClientDetail() {
         </div>
       </div>
 
-      {/* Модалка: Передать клиента другому менеджеру */}
+      {/* Модалка передачи клиента */}
       {isTransferModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">
@@ -840,7 +874,7 @@ export default function ClientClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Добавление нового тега */}
+      {/* Модалка тегов */}
       {isAddTagOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[480px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200">
@@ -906,7 +940,7 @@ export default function ClientClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Избранное */}
+      {/* Модалка Избранное */}
       {isFavoritesOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[384px] h-[495px] rounded-[10px] bg-[#F5F7FA] p-[15px] shadow-2xl border border-gray-200 flex flex-col justify-between">
@@ -949,7 +983,7 @@ export default function ClientClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Заметка */}
+      {/* Модалка Заметка */}
       {isAddNoteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[600px] h-[515px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
@@ -1003,7 +1037,7 @@ export default function ClientClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Отложить задачу */}
+      {/* Модалка Отложить задачу */}
       {isPostponeTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[600px] h-[496px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
@@ -1072,7 +1106,7 @@ export default function ClientClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Завершение задачи */}
+      {/* Модалка Завершение задачи */}
       {isCompleteTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[600px] h-[458px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">

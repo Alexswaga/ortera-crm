@@ -24,7 +24,6 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      // Отправляем запрос на бэкенд (логин/email + пароль)
       const data = await authApi.login({ 
         email: login.trim(), 
         password: password.trim() 
@@ -32,9 +31,9 @@ export default function Auth() {
 
       const role = data.user?.role;
 
-      // Менеджер и клиент отправляются в свой кабинет /client
-      // Администратор отправляется в корень /
-      if (role === "manager" || role === "client") {
+      if (role === "partner") {
+        navigate("/partner");
+      } else if (role === "manager" || role === "client") {
         navigate("/client");
       } else {
         navigate("/");
@@ -50,18 +49,13 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-white px-4 py-12 font-['Inter'] selection:bg-[#2ABAEF]/20">
-      
-      {/* Контейнер 600px */}
       <div className="w-full max-w-[600px] flex flex-col">
-        
-        {/* Логотип */}
         <img
           src="https://api.builder.io/api/v1/image/assets/TEMP/507a728f26a32594d6eeafa7e1d1d91c9f987324"
           alt="ORTERA"
           className="w-[150px] h-[48px] mb-6 object-contain self-start hover:opacity-90 transition-opacity cursor-pointer"
         />
 
-        {/* Карточка авторизации */}
         <div className="w-full rounded-[10px] bg-[#F5F7FA] border border-dashed border-gray-300 p-[30px] shadow-xs transition-all">
           <h1 className="text-[20px] font-bold text-[#576686] mb-6">
             Авторизация
@@ -74,8 +68,6 @@ export default function Auth() {
           )}
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-            
-            {/* Поле Логин */}
             <div className="flex flex-col">
               <label htmlFor="login" className="block text-xs text-[#576686] mb-2 font-medium">
                 Логин
@@ -92,7 +84,6 @@ export default function Auth() {
               />
             </div>
 
-            {/* Поле Пароль */}
             <div className="flex flex-col">
               <label htmlFor="password" className="block text-xs text-[#576686] mb-2 font-medium">
                 Пароль
@@ -119,7 +110,6 @@ export default function Auth() {
               </div>
             </div>
 
-            {/* Кнопка Войти */}
             <button
               type="submit"
               disabled={isLoading}
@@ -135,14 +125,11 @@ export default function Auth() {
               )}
             </button>
 
-            {/* Текст с переносом */}
             <p className="text-[14px] text-[#576686] leading-snug mt-2">
               Для восстановления пароля следует обратиться<br />к администратору.
             </p>
-            
           </form>
         </div>
-
       </div>
     </div>
   );

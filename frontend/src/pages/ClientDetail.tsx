@@ -17,7 +17,10 @@ import {
   Send,
   CreditCard,
   GraduationCap,
-  UserCheck
+  UserCheck,
+  Gift,
+  ShoppingCart,
+  Folder
 } from "lucide-react";
 import { clientsApi, tasksApi, settingsApi, scheduleApi, managersApi } from "../api/services";
 
@@ -188,18 +191,17 @@ export default function ClientDetail() {
   const [completedCourses, setCompletedCourses] = useState<any[]>([]);
   const [, setLoading] = useState(true);
 
-  // Списки и модалки
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
   const [isPostponeTaskOpen, setIsPostponeTaskOpen] = useState(false);
   const [isCompleteTaskOpen, setIsCompleteTaskOpen] = useState(false);
   const [isAddTagOpen, setIsAddTagOpen] = useState(false);
 
-  // Модалка передачи клиента
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [managersList, setManagersList] = useState<any[]>([]);
   const [selectedNewManagerId, setSelectedNewManagerId] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [noteText, setNoteText] = useState("");
@@ -295,14 +297,16 @@ export default function ClientDetail() {
     }
   };
 
-  const handleToggleStatus = async () => {
+  const handleConvertToBuyer = async () => {
     if (!client?._id) return;
-    const newStatus = client.status === "Лид" ? "Покупатель" : "Лид";
-    setClient((prev: any) => ({ ...prev, status: newStatus }));
     try {
-      await clientsApi.update(client._id, { status: newStatus });
+      setIsConverting(true);
+      await clientsApi.convertToBuyer(client._id);
+      await loadClientData();
     } catch (err) {
-      console.error("Ошибка обновления статуса:", err);
+      console.error("Ошибка конвертации Лида в Покупателя:", err);
+    } finally {
+      setIsConverting(false);
     }
   };
 
@@ -363,7 +367,6 @@ export default function ClientDetail() {
     }
   };
 
-  // Обработка передачи клиента новому менеджеру
   const handleOpenTransferModal = () => {
     const currentMgrId = client?.manager?._id || client?.manager;
     const firstOtherMgr = managersList.find((m) => m._id !== currentMgrId);
@@ -390,9 +393,12 @@ export default function ClientDetail() {
   const clientName = client?.name || "Клиент";
   const clientSub = client?.city ? `г. ${client.city} / ${client.activity || ""}` : client?.activity || "Клиент";
   const clientStatus = client?.status || "Лид";
+  const isBuyer = clientStatus === "Покупатель";
   const clientEmail = client?.email || "123@ya.ru";
   const clientPhone = client?.phone || "+7 927 668 95 18";
   const managerName = client?.manager?.name || "Не назначен";
+  const isTrialSent = Boolean(client?.isTrialSent);
+  const partnerName = client?.partner?.name;
 
   return (
     <div className="w-full bg-white px-[210px] pt-0 pb-12 font-['Inter'] relative selection:bg-[#2ABAEF]/20">
@@ -412,16 +418,30 @@ export default function ClientDetail() {
                 </span>
 
                 <div 
-                  onClick={handleToggleStatus}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-sky-400 rounded-full text-white text-xs cursor-pointer select-none hover:bg-sky-500 transition-colors"
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs select-none ${
+                    isBuyer ? "bg-emerald-500 font-bold" : "bg-sky-400 font-medium"
+                  }`}
                 >
                   <span>{clientStatus}</span>
-                  <ChevronDown className="w-3.5 h-3.5" />
                 </div>
+
+                {isTrialSent && (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-purple-500/80 rounded-full text-white text-xs select-none">
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Пробник отправлен</span>
+                  </div>
+                )}
+
+                {partnerName && (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-amber-500/90 rounded-full text-white text-xs select-none">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Партнёр: {partnerName}</span>
+                  </div>
+                )}
               </div>
 
               <div className="text-white/80 text-xs mt-0.5">
-                {clientSub} • Менеджер: <span className="font-semibold text-white">{managerName}</span>
+                {clientSub} • Менеджер: <span className="font-semibold text-white">{managerName}</span> • Папка в 1С: <span className="text-[#2ABAEF] font-semibold">{client?.oneCFolder || (partnerName ? "Сетевые партнеры" : "Основные покупатели")}</span>
               </div>
             </div>
           </div>
@@ -458,12 +478,40 @@ export default function ClientDetail() {
           </div>
         </div>
 
+        {/* Баннер конвертации Лида в Покупателя (Реализация 1С) */}
+        {!isBuyer && (
+          <div className="mt-6 p-5 rounded-[10px] bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-4 shadow-xs animate-fadeIn">
+            <div className="flex items-center gap-3.5">
+              <div className="size-11 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <ShoppingCart className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900">
+                  Клиент сейчас находится в статусе «Лид» (переговоры)
+                </h3>
+                <p className="text-xs text-emerald-700/80 mt-0.5">
+                  Лиды не выгружаются в 1С. Когда совершена первая продажа или отгрузка, переведите в «Покупатели», чтобы включить обмен с 1С.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isConverting}
+              onClick={handleConvertToBuyer}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              <Check className="size-4" />
+              <span>{isConverting ? "Перевод..." : "Перевести в Покупатели (Реализация 1С)"}</span>
+            </button>
+          </div>
+        )}
+
         {/* Основной контейнер */}
         <div className="rounded-[10px] bg-[#F5F7FA] p-8 border border-gray-200 min-h-[838px] mt-[30px] flex flex-col justify-between shadow-xs">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               
-              {/* Вкладки: Все | Задачи | Заметки | Пройденные курсы */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -517,7 +565,6 @@ export default function ClientDetail() {
                 </button>
               </div>
 
-              {/* Кнопки действий: Передать клиента (левее) + Заметка + Задача */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -549,7 +596,7 @@ export default function ClientDetail() {
               </div>
             </div>
 
-            {/* Теги клиента */}
+            {/* Теги */}
             <div className="flex flex-wrap items-center gap-2.5 mb-8">
               {tags.map((tag) => (
                 <div
@@ -616,7 +663,6 @@ export default function ClientDetail() {
               <div className="relative pl-24">
                 <div className="absolute left-[78px] top-4 bottom-4 w-px bg-[#576686]" />
 
-                {/* Задачи */}
                 {(activeFilter === "all" || activeFilter === "tasks") && tasks.map((task) => (
                   <div key={task._id} className="relative mb-10">
                     <div className="absolute -left-24 top-0 text-right text-xs text-[#576686]">
@@ -753,7 +799,7 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Модалка: Передать клиента другому менеджеру */}
+      {/* Модалка передачи клиента */}
       {isTransferModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[500px] rounded-[10px] bg-[#F5F7FA] p-8 shadow-2xl border border-gray-200">
@@ -820,7 +866,7 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Добавление нового тега */}
+      {/* Модалка тегов */}
       {isAddTagOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[480px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200">
@@ -886,7 +932,103 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Отложить задачу */}
+      {/* Модалка Избранное */}
+      {isFavoritesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[384px] h-[495px] rounded-[10px] bg-[#F5F7FA] p-[15px] shadow-2xl border border-gray-200 flex flex-col justify-between">
+            <button
+              type="button"
+              onClick={() => setIsFavoritesOpen(false)}
+              className="absolute right-3 top-3 z-20 flex size-8 items-center justify-center rounded-full bg-white/50 text-[#576686] hover:bg-white active:scale-95 transition-all cursor-pointer"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="flex flex-col gap-2 overflow-y-auto pr-2 relative max-h-full">
+              {allClients.map((item) => (
+                <div
+                  key={item._id}
+                  onClick={() => {
+                    setSearchParams({ id: item._id });
+                    setIsFavoritesOpen(false);
+                  }}
+                  className={`p-5 rounded-md flex items-start gap-2.5 cursor-pointer transition-all duration-150 ${
+                    item._id === client?._id ? "bg-white shadow-sm border border-gray-100" : "bg-[#F5F7FA] hover:bg-white/80"
+                  }`}
+                >
+                  <div className="size-4 shrink-0 mt-0.5 text-[#576686]">
+                    <User className="size-4" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="text-[16px] font-bold text-[#576686] leading-tight truncate">
+                      {item.name}
+                    </div>
+                    <div className="text-[12px] text-[#576686]">
+                      {item.city ? `г. ${item.city} / ${item.activity}` : item.activity}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка Заметка */}
+      {isAddNoteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="relative w-[600px] h-[515px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
+            <button
+              type="button"
+              onClick={() => setIsAddNoteOpen(false)}
+              className="absolute right-[30px] top-[30px] flex size-11 items-center justify-center rounded-full bg-white/50 text-[#576686] hover:bg-white active:scale-95 transition-all duration-150 cursor-pointer"
+            >
+              <X className="size-5" />
+            </button>
+
+            <div>
+              <h2 className="text-[18px] font-bold text-[#576686] mb-6">
+                Добавление заметки
+              </h2>
+
+              <div className="group flex flex-col gap-2">
+                <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
+                  Текст заметки
+                </label>
+                <textarea
+                  rows={8}
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Текст"
+                  className="w-full h-72 rounded-md border border-[rgba(87,102,134,0.2)] bg-white p-4 text-base text-[#576686] outline-none resize-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-6">
+              <button
+                type="button"
+                onClick={() => setIsAddNoteOpen(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-5 py-4 text-base text-[#576686] hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800 border border-gray-200 active:scale-[0.98] transition-all duration-150 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Отмена</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveNote}
+                className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-6 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-medium"
+              >
+                <SaveFloppyIcon className="w-4 h-4 text-white" />
+                <span>Сохранить</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка Отложить задачу */}
       {isPostponeTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[600px] h-[496px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
@@ -955,103 +1097,7 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* Модалка: Избранное */}
-      {isFavoritesOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
-          <div className="relative w-[384px] h-[495px] rounded-[10px] bg-[#F5F7FA] p-[15px] shadow-2xl border border-gray-200 flex flex-col justify-between">
-            <button
-              type="button"
-              onClick={() => setIsFavoritesOpen(false)}
-              className="absolute right-3 top-3 z-20 flex size-8 items-center justify-center rounded-full bg-white/50 text-[#576686] hover:bg-white active:scale-95 transition-all cursor-pointer"
-            >
-              <X className="size-4" />
-            </button>
-
-            <div className="flex flex-col gap-2 overflow-y-auto pr-2 relative max-h-full">
-              {allClients.map((item) => (
-                <div
-                  key={item._id}
-                  onClick={() => {
-                    setSearchParams({ id: item._id });
-                    setIsFavoritesOpen(false);
-                  }}
-                  className={`p-5 rounded-md flex items-start gap-2.5 cursor-pointer transition-all duration-150 ${
-                    item._id === client?._id ? "bg-white shadow-sm border border-gray-100" : "bg-[#F5F7FA] hover:bg-white/80"
-                  }`}
-                >
-                  <div className="size-4 shrink-0 mt-0.5 text-[#576686]">
-                    <User className="size-4" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="text-[16px] font-bold text-[#576686] leading-tight truncate">
-                      {item.name}
-                    </div>
-                    <div className="text-[12px] text-[#576686]">
-                      {item.city ? `г. ${item.city} / ${item.activity}` : item.activity}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модалка: Добавление заметки */}
-      {isAddNoteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
-          <div className="relative w-[600px] h-[515px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
-            <button
-              type="button"
-              onClick={() => setIsAddNoteOpen(false)}
-              className="absolute right-[30px] top-[30px] flex size-11 items-center justify-center rounded-full bg-white/50 text-[#576686] hover:bg-white active:scale-95 transition-all duration-150 cursor-pointer"
-            >
-              <X className="size-5" />
-            </button>
-
-            <div>
-              <h2 className="text-[18px] font-bold text-[#576686] mb-6">
-                Добавление заметки
-              </h2>
-
-              <div className="group flex flex-col gap-2">
-                <label className="text-xs text-[#576686] font-medium transition-colors group-focus-within:text-[#2ABAEF]">
-                  Текст заметки
-                </label>
-                <textarea
-                  rows={8}
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Текст"
-                  className="w-full h-72 rounded-md border border-[rgba(87,102,134,0.2)] bg-white p-4 text-base text-[#576686] outline-none resize-none transition-all duration-200 hover:border-[#576686]/60 focus:border-[#2ABAEF] focus:ring-4 focus:ring-[#2ABAEF]/15 placeholder:text-[#576686]/40"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-6">
-              <button
-                type="button"
-                onClick={() => setIsAddNoteOpen(false)}
-                className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-5 py-4 text-base text-[#576686] hover:bg-slate-100 hover:border-slate-300 hover:text-slate-800 border border-gray-200 active:scale-[0.98] transition-all duration-150 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-                <span>Отмена</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveNote}
-                className="inline-flex items-center justify-center gap-2.5 rounded-[10px] bg-[#576686] px-6 py-4 text-base text-white hover:bg-[#475470] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-150 cursor-pointer font-medium"
-              >
-                <SaveFloppyIcon className="w-4 h-4 text-white" />
-                <span>Сохранить</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модалка: Завершение задачи */}
+      {/* Модалка Завершение задачи */}
       {isCompleteTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#576686]/70 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-[600px] h-[458px] rounded-[10px] bg-[#F5F7FA] p-[30px] shadow-2xl border border-gray-200 flex flex-col justify-between">
