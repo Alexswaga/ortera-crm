@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
+type UserRole = "admin" | "manager" | "partner" | "client";
+
 interface JwtPayload {
   id: string;
-  role: "admin" | "manager" | "client";
+  role: UserRole;
   email: string;
 }
 
@@ -30,7 +32,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
   }
 };
 
-export const requireRoles = (roles: ("admin" | "manager" | "client")[]) => {
+export const requireRoles = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
       res.status(403).json({ message: "Доступ запрещен: недостаточно прав" });
